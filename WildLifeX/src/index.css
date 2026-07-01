@@ -1,0 +1,220 @@
+@import url('https://fonts.googleapis.com/css2?family=Protest+Guerrilla&family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* ─── Register custom theme tokens for Tailwind v4 ─────────────────────── */
+@theme {
+  --font-display:  'Protest Guerrilla', serif;
+  --font-heading:  'Poppins', sans-serif;
+  --font-body:     'Inter', sans-serif;
+
+  --color-ocean-dark:   #355872;
+  --color-ocean-mid:    #7AAACE;
+  --color-ocean-light:  #F7F8F0;
+  --color-forest-dark:  #346739;
+  --color-forest-mid:   #79AE6F;
+  --color-forest-light: #F2EDC2;
+  --color-dark:         #1A1A1A;
+  --color-charcoal:     #2D2D2D;
+
+  --radius-card: 1rem;
+  --radius-pill: 9999px;
+
+  --shadow-card:        0 4px 24px rgba(0,0,0,0.18);
+  --shadow-glow-ocean:  0 0 32px rgba(122,170,206,0.3);
+  --shadow-glow-forest: 0 0 32px rgba(121,174,111,0.3);
+
+  --animate-fade-up:     fade-up 0.7s ease forwards;
+  --animate-fade-in:     fade-in 0.6s ease forwards;
+  --animate-float:       float 4s ease-in-out infinite;
+  --animate-fade-up-200: fade-up 0.7s ease 0.2s forwards;
+  --animate-fade-up-400: fade-up 0.7s ease 0.4s forwards;
+  --animate-fade-up-600: fade-up 0.7s ease 0.6s forwards;
+
+  @keyframes fade-up {
+    0%   { opacity: 0; transform: translateY(24px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    0%   { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-12px); }
+  }
+}
+
+/* ─── CSS Variables (runtime, for JS/inline use) ────────────────────────── */
+:root {
+  --color-primary:    #355872;
+  --color-mid:        #7AAACE;
+  --color-light-bg:   #F7F8F0;
+  --color-dark-bg:    #1A1A1A;
+  --color-card-dark:  #2D2D2D;
+  --color-text-dark:  #1A1A1A;
+  --color-text-light: #F7F8F0;
+  --color-text-muted: #6B7280;
+}
+
+body.theme-forest {
+  --color-primary:  #346739;
+  --color-mid:      #79AE6F;
+  --color-light-bg: #F2EDC2;
+}
+
+/* ─── Base resets ───────────────────────────────────────────────────────── */
+@layer base {
+  html, body, #root { height: 100%; }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--color-light-bg);
+    color: var(--color-text-dark);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  p { font-family: var(--font-body); line-height: 1.7; }
+  a { color: inherit; text-decoration: none; }
+  img { display: block; max-width: 100%; }
+}
+
+/* ─── Components ────────────────────────────────────────────────────────── */
+@layer components {
+
+  .section-container {
+    max-width: 80rem;
+    margin-inline: auto;
+    padding-inline: 1.5rem;
+  }
+
+  .section-padding {
+    padding-block: 5rem;
+  }
+
+  .section-title {
+    font-family: var(--font-heading);
+    font-size: clamp(1.5rem, 3vw, 2.25rem);
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--color-primary);
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 10vw, 7rem);
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 0.875rem;
+    background-color: var(--color-primary);
+    color: var(--color-text-light);
+    transition: all 0.3s ease;
+  }
+  .btn-primary:hover {
+    background-color: var(--color-mid);
+    transform: scale(1.05);
+  }
+
+  .btn-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border-radius: 9999px;
+    border: 1px solid var(--color-mid);
+    font-family: var(--font-heading);
+    font-weight: 500;
+    font-size: 0.875rem;
+    color: var(--color-mid);
+    transition: all 0.3s ease;
+  }
+  .btn-outline:hover {
+    background-color: var(--color-mid);
+    transform: scale(1.05);
+  }
+
+  .feature-card {
+    border-radius: 1rem;
+    overflow: hidden;
+    background-color: var(--color-card-dark);
+    transition: transform 0.3s ease;
+  }
+  .feature-card:hover { transform: translateY(-0.5rem); }
+
+  .stat-number {
+    font-family: var(--font-heading);
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--color-text-light);
+  }
+
+  .nav-link {
+    font-family: var(--font-heading);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-light);
+    transition: color 0.2s ease;
+  }
+  .nav-link:hover { color: var(--color-mid); }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  .opacity-0-start { opacity: 0; }
+
+  .text-stroke {
+    -webkit-text-stroke: 2px var(--color-mid);
+    color: transparent;
+  }
+
+  .hero-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.2));
+  }
+
+  ::-webkit-scrollbar {
+  width: 12px;
+}
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-light-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #355872;
+    border-radius: 9999px;
+
+    /* Creates space around thumb */
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+}
