@@ -114,15 +114,65 @@ export default function Contact() {
   const [sent, setSent]   = useState(false);
   const [sending, setSending] = useState(false);
 
+  const [reviewForm, setReviewForm] = useState({ name: "", email: "", text: "", rating: 5 });
+  const [reviewSent, setReviewSent] = useState(false);
+  const [reviewSending, setReviewSending] = useState(false);
+
   const handleChange = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const handleReviewChange = (e) => setReviewForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name || !form.email || !form.message) {
+      alert("Name, email, and message are required.");
+      return;
+    }
     setSending(true);
-    // Replace with your actual form submission logic (e.g. EmailJS / Formspree)
-    await new Promise(r => setTimeout(r, 1200));
-    setSending(false);
-    setSent(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/contact/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      if (res.ok) {
+        setSent(true);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to send message.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    if (!reviewForm.name || !reviewForm.text) {
+      alert("Name and review comment are required.");
+      return;
+    }
+    setReviewSending(true);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/api/reviews/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewForm)
+      });
+      if (res.ok) {
+        setReviewSent(true);
+      } else {
+        const errData = await res.json();
+        alert(errData.error || "Failed to submit review.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to connect to backend server.");
+    } finally {
+      setReviewSending(false);
+    }
   };
 
   // FAQ data
@@ -222,71 +272,171 @@ export default function Contact() {
 
         <div className="relative z-10 max-w-5xl mx-auto grid lg:grid-cols-[1fr_380px] gap-10 items-start">
 
-          {/* ── LEFT: FORM ── */}
-          <Reveal>
-            <div className="rounded-2xl p-8 md:p-10
-                            backdrop-blur-md bg-white/[0.07]
-                            border border-white/[0.13]
-                            shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
-                 style={{ borderTop: "2px solid rgba(122,170,206,0.35)" }}>
-
-              <p className="font-heading text-[0.6rem] font-bold tracking-[0.2em] uppercase text-[#7AAACE] mb-1">
-                Send a Message
-              </p>
-              <h2 className="font-heading font-bold text-[#F7F8F0] text-2xl mb-8">
-                Let's start a conversation
-              </h2>
-
-              {sent ? (
-                <div className="flex flex-col items-center text-center gap-4 py-10">
-                  <div className="w-14 h-14 rounded-full bg-[#79AE6F]/15 border border-[#79AE6F]/40
-                                  flex items-center justify-center text-2xl">
-                    ✓
+          {/* ── LEFT: FORMS ── */}
+          <div className="flex flex-col gap-8 w-full">
+            <Reveal>
+              <div className="rounded-2xl p-8 md:p-10
+                              backdrop-blur-md bg-white/[0.07]
+                              border border-white/[0.13]
+                              shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
+                   style={{ borderTop: "2px solid rgba(122,170,206,0.35)" }}>
+  
+                <p className="font-heading text-[0.6rem] font-bold tracking-[0.2em] uppercase text-[#7AAACE] mb-1">
+                  Send a Message
+                </p>
+                <h2 className="font-heading font-bold text-[#F7F8F0] text-2xl mb-8">
+                  Let's start a conversation
+                </h2>
+  
+                {sent ? (
+                  <div className="flex flex-col items-center text-center gap-4 py-10">
+                    <div className="w-14 h-14 rounded-full bg-[#79AE6F]/15 border border-[#79AE6F]/40
+                                    flex items-center justify-center text-2xl">
+                      ✓
+                    </div>
+                    <p className="font-heading font-semibold text-[#F7F8F0] text-lg">Message sent!</p>
+                    <p className="font-body text-[#F7F8F0]/45 text-sm leading-relaxed max-w-xs">
+                      Thanks for reaching out. I'll get back to you within 24–48 hours.
+                    </p>
+                    <button
+                      onClick={() => { setSent(false); setForm({ name:"", email:"", subject:"", message:"" }); }}
+                      className="mt-2 font-heading text-[0.7rem] tracking-[0.14em] uppercase text-[#7AAACE] hover:text-[#A8D4F5] transition-colors"
+                    >
+                      Send another →
+                    </button>
                   </div>
-                  <p className="font-heading font-semibold text-[#F7F8F0] text-lg">Message sent!</p>
-                  <p className="font-body text-[#F7F8F0]/45 text-sm leading-relaxed max-w-xs">
-                    Thanks for reaching out. I'll get back to you within 24–48 hours.
-                  </p>
-                  <button
-                    onClick={() => { setSent(false); setForm({ name:"", email:"", subject:"", message:"" }); }}
-                    className="mt-2 font-heading text-[0.7rem] tracking-[0.14em] uppercase text-[#7AAACE] hover:text-[#A8D4F5] transition-colors"
-                  >
-                    Send another →
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                  <div className="grid sm:grid-cols-2 gap-5">
-                    <GlassInput label="Name"    name="name"    value={form.name}    onChange={handleChange} placeholder="Your name"  />
-                    <GlassInput label="Email"   name="email"   type="email" value={form.email}   onChange={handleChange} placeholder="you@example.com" />
-                  </div>
-                  <GlassInput label="Subject" name="subject" value={form.subject} onChange={handleChange} placeholder="What's this about?" />
-                  <GlassInput label="Message" name="message" value={form.message} onChange={handleChange} placeholder="Tell me more…" rows={5} />
+                ) : (
+                  <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+                    <div className="grid sm:grid-cols-2 gap-5">
+                      <GlassInput label="Name"    name="name"    value={form.name}    onChange={handleChange} placeholder="Your name"  />
+                      <GlassInput label="Email"   name="email"   type="email" value={form.email}   onChange={handleChange} placeholder="you@example.com" />
+                    </div>
+                    <GlassInput label="Subject" name="subject" value={form.subject} onChange={handleChange} placeholder="What's this about?" />
+                    <GlassInput label="Message" name="message" value={form.message} onChange={handleChange} placeholder="Tell me more…" rows={5} />
+  
+                    <button
+                      type="submit"
+                      disabled={sending}
+                      className="mt-2 self-start flex items-center gap-2 px-6 py-3 rounded-full
+                                 bg-[#7AAACE] hover:bg-[#355872] disabled:opacity-50
+                                 font-heading font-medium text-sm text-[#F7F8F0]
+                                 transition-all duration-300 hover:scale-[1.03]"
+                    >
+                      {sending ? (
+                        <>
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-[#F7F8F0]/30 border-t-[#F7F8F0] animate-spin" />
+                          Sending…
+                        </>
+                      ) : "Send Message →"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </Reveal>
 
-                  <button
-                    type="submit"
-                    disabled={sending}
-                    className="mt-2 self-start flex items-center gap-2 px-6 py-3 rounded-full
-                               bg-[#7AAACE] hover:bg-[#355872] disabled:opacity-50
-                               font-heading font-medium text-sm text-[#F7F8F0]
-                               transition-all duration-300 hover:scale-[1.03]"
-                  >
-                    {sending ? (
-                      <>
-                        <span className="w-3.5 h-3.5 rounded-full border-2 border-[#F7F8F0]/30 border-t-[#F7F8F0] animate-spin" />
-                        Sending…
-                      </>
-                    ) : "Send Message →"}
-                  </button>
-                </form>
-              )}
-            </div>
-          </Reveal>
+            <Reveal delay={0.1}>
+              <div className="rounded-2xl p-8 md:p-10
+                              backdrop-blur-md bg-white/[0.07]
+                              border border-white/[0.13]
+                              shadow-[0_8px_40px_rgba(0,0,0,0.4)]"
+                   style={{ borderTop: "2px solid rgba(121,174,111,0.35)" }}>
+                <p className="font-heading text-[0.6rem] font-bold tracking-[0.2em] uppercase text-[#79AE6F] mb-1">
+                  Submit a Review / Comment
+                </p>
+                <h2 className="font-heading font-bold text-[#F7F8F0] text-2xl mb-8">
+                  Share your experience with us
+                </h2>
+
+                {reviewSent ? (
+                  <div className="flex flex-col items-center text-center gap-4 py-10">
+                    <div className="w-14 h-14 rounded-full bg-[#79AE6F]/15 border border-[#79AE6F]/40
+                                    flex items-center justify-center text-2xl">
+                      ✓
+                    </div>
+                    <p className="font-heading font-semibold text-[#F7F8F0] text-lg">Review submitted!</p>
+                    <p className="font-body text-[#F7F8F0]/45 text-sm leading-relaxed max-w-xs">
+                      Thank you! Your feedback will help other users learn and has been published on the home page.
+                    </p>
+                    <button
+                      onClick={() => { setReviewSent(false); setReviewForm({ name: "", email: "", text: "", rating: 5 }); }}
+                      className="mt-2 font-heading text-[0.7rem] tracking-[0.14em] uppercase text-[#79AE6F] hover:text-[#9AD190] transition-colors hover:cursor-pointer"
+                    >
+                      Write another review →
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleReviewSubmit} className="flex flex-col gap-5">
+                    <div className="grid sm:grid-cols-2 gap-5">
+                      <GlassInput
+                        label="Name"
+                        name="name"
+                        value={reviewForm.name}
+                        onChange={handleReviewChange}
+                        placeholder="Your name"
+                      />
+                      <GlassInput
+                        label="Email (Optional)"
+                        name="email"
+                        type="email"
+                        value={reviewForm.email}
+                        onChange={handleReviewChange}
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    
+                    {/* Star Rating Selector */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-heading text-[0.65rem] font-semibold tracking-[0.16em] uppercase text-[#F7F8F0]/40">
+                        Rating
+                      </label>
+                      <div className="flex gap-2 text-xl">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setReviewForm(f => ({ ...f, rating: star }))}
+                            className={`cursor-pointer transition ${reviewForm.rating >= star ? "text-yellow-400" : "text-white/20"}`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <GlassInput
+                      label="Your Comment"
+                      name="text"
+                      value={reviewForm.text}
+                      onChange={handleReviewChange}
+                      placeholder="Write your review or comment about WildlifeX here..."
+                      rows={4}
+                    />
+
+                    <button
+                      type="submit"
+                      disabled={reviewSending}
+                      className="mt-2 self-start flex items-center gap-2 px-6 py-3 rounded-full
+                                 bg-[#79AE6F] hover:bg-[#346739] disabled:opacity-50
+                                 font-heading font-medium text-sm text-[#0c0c0c] hover:text-[#F7F8F0]
+                                 transition-all duration-300 hover:scale-[1.03] hover:cursor-pointer"
+                    >
+                      {reviewSending ? (
+                        <>
+                          <span className="w-3.5 h-3.5 rounded-full border-2 border-[#0c0c0c]/30 border-t-[#0c0c0c] animate-spin" />
+                          Submitting…
+                        </>
+                      ) : "Submit Review →"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </Reveal>
+          </div>
 
           {/* ── RIGHT: INFO + SOCIAL ── */}
           <div className="flex flex-col gap-4">
             <Reveal delay={0.1}>
-              <InfoCard icon="✉️" label="Email"         accent="ocean"  value="wildlifex.contact@gmail.com" />
+              <InfoCard icon="✉️" label="Email"         accent="ocean"  value="wildlifex74@gmail.com" />
             </Reveal>
             <Reveal delay={0.2}>
               <InfoCard icon="📍" label="Location"      accent="forest" value="Sri Lanka" />

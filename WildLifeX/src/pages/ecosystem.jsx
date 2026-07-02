@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 // ─── ASSETS (swap with your real paths) ──────────────────────────────────────
@@ -257,6 +257,14 @@ function EcoCard({ eco, selected, onSelect, onStart }) {
 export default function EcosystemSelect({ onStart }) {
   const [selected, setSelected] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Authentication required. Please sign in or register to select and manage ecosystems.");
+      navigate("/signin");
+    }
+  }, [navigate]);
 
   function handleStart(id) {
     if (onStart) {

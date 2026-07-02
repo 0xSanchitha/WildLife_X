@@ -19,6 +19,7 @@ export default function SimulationCanvas({
 
   const hasDraggedRef = useRef(false);
   const dragStartPos = useRef({ x: 0, y: 0 });
+  const imageCache = useRef({});
 
   // Handle visibility catch-up for offline/AFK simulation
   useEffect(() => {
@@ -465,8 +466,41 @@ export default function SimulationCanvas({
           ctx.scale(-1, 1);
         }
         
-        // Draw emoji
-        ctx.fillText(emoji, 0, 1);
+        let imgLoaded = false;
+        if (!a.isDead && sim.animalDefinitions) {
+          const speciesDef = sim.animalDefinitions[a.speciesId];
+          if (speciesDef) {
+            const imageUrl = speciesDef.image || (speciesDef.images && speciesDef.images[0]);
+            if (imageUrl) {
+              let cachedImg = imageCache.current[imageUrl];
+              if (!cachedImg) {
+                cachedImg = new Image();
+                cachedImg.src = imageUrl;
+                cachedImg.onload = () => {
+                  // Re-renders naturally with loop ticks
+                };
+                imageCache.current[imageUrl] = cachedImg;
+              }
+              if (cachedImg.complete && cachedImg.naturalWidth > 0) {
+                imgLoaded = true;
+                
+                // Draw rounded circular mask for image inside the card badge
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(0, 0, 12.5, 0, Math.PI * 2);
+                ctx.clip();
+                // Draw image centered
+                ctx.drawImage(cachedImg, -13, -13, 26, 26);
+                ctx.restore();
+              }
+            }
+          }
+        }
+
+        if (!imgLoaded) {
+          // Draw emoji fallback
+          ctx.fillText(emoji, 0, 1);
+        }
         ctx.restore();
 
         // Gender marker indicator (small dot in top right of card)

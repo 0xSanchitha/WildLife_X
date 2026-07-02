@@ -48,6 +48,15 @@ export default function EcosystemBuilder() {
   const [savedSimulations, setSavedSimulations] = useState([]);
   const [loadingSaves, setLoadingSaves] = useState(false);
 
+  // Redirect to sign in if not authenticated
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Authentication required. Please sign in or register to launch the simulator.");
+      navigate("/signin");
+    }
+  }, [navigate]);
+
   // Fetch animal definitions from MongoDB on mount
   useEffect(() => {
     setLoadingAnimals(true);

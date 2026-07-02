@@ -68,6 +68,21 @@ function Label({ children }) {
 // ─── PAGE ────────────────────────────────────────────────────────────────────
 export default function About() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({ users: 274, animals: 120, ecosystems: 45, reviews: 102 });
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/api/stats/")
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          users: data.users ?? 274,
+          animals: data.animals ?? 120,
+          ecosystems: data.ecosystems ?? 45,
+          reviews: data.reviews ?? 102
+        });
+      })
+      .catch(err => console.error("Error fetching stats:", err));
+  }, []);
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -121,10 +136,10 @@ export default function About() {
       <section className="bg-[#F2EDC2] py-16 px-6 md:px-16">
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
           {[
-            { n: 500, s: "+", label: "Animal Species"   },
-            { n: 12,  s: "+", label: "Ecosystem Types"  },
-            { n: 3,   s: "",  label: "Simulation Modes" },
-            { n: 100, s: "%", label: "Open Source"      },
+            { n: stats.animals, s: "+", label: "Animal Species"   },
+            { n: stats.ecosystems,  s: "+", label: "Ecosystems Created"  },
+            { n: stats.users,   s: "+",  label: "Active Users" },
+            { n: stats.reviews, s: "+", label: "Reviews & Feedback"      },
           ].map(({ n, s, label }) => (
             <div key={label}>
               <div className="font-heading font-bold text-[2.8rem] md:text-[3.4rem] text-[#346739] leading-none">

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import bush from '../../assets/decorative/bush.png'
 
 const STATS = [
@@ -23,6 +23,38 @@ const REVIEWS = [
 ]
 
 export default function Ending() {
+  const [stats, setStats] = useState({ users: 274, animals: 120, reviews: 102 });
+  const [reviews, setReviews] = useState([]);
+
+  useEffect(() => {
+    // Fetch stats
+    fetch("http://127.0.0.1:5000/api/stats/")
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          users: data.users ?? 274,
+          animals: data.animals ?? 120,
+          reviews: data.reviews ?? 102
+        });
+      })
+      .catch(err => console.error("Error fetching stats:", err));
+
+    // Fetch reviews
+    fetch("http://127.0.0.1:5000/api/reviews/")
+      .then(res => res.json())
+      .then(data => {
+        setReviews(data);
+      })
+      .catch(err => console.error("Error fetching reviews:", err));
+  }, []);
+
+  const displayStats = [
+    { label: 'Active Users',   value: stats.users },
+    { label: 'Animals Catalog', value: stats.animals },
+    { label: 'Reviews Shared',  value: stats.reviews },
+  ];
+
+  const activeReviews = reviews.length > 0 ? reviews : REVIEWS;
   return (
     <section className="relative w-full bg-white overflow-hidden pb-0">
 
@@ -71,9 +103,9 @@ export default function Ending() {
 
         {/* ── STATS CARD ── */}
         <div className="w-full rounded-[1.25rem] bg-[#346739] px-6 sm:px-10 py-8 sm:py-10 grid grid-cols-3 gap-4 shadow-[0_8px_32px_rgba(52,103,57,0.25)]">
-          {STATS.map((s) => (
+          {displayStats.map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-2 sm:gap-3">
-              <p className="font-heading font-bold text-[#79AE6F] text-[0.8rem] sm:text-[1rem] lg:text-[1.1rem] uppercase tracking-widest">
+              <p className="font-heading font-bold text-[#79AE6F] text-[0.8rem] sm:text-[1rem] lg:text-[1.1rem] uppercase tracking-widest text-center">
                 {s.label}
               </p>
               <p className="font-heading font-extrabold text-[#F2EDC2] text-[2rem] sm:text-[3rem] lg:text-[3.5rem] leading-none">
@@ -85,9 +117,9 @@ export default function Ending() {
 
         {/* ── REVIEWS ── */}
         <div className="w-full flex flex-col gap-5">
-          {REVIEWS.map((r) => (
+          {activeReviews.map((r) => (
             <div
-              key={r.id}
+              key={r._id || r.id}
               className="w-full rounded-[1.25rem] bg-[#79AE6F] px-5 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-[0_4px_20px_rgba(52,103,57,0.2)]"
             >
               {/* Avatar */}
@@ -104,13 +136,21 @@ export default function Ending() {
               </div>
 
               {/* Quote */}
-              <div className="flex flex-col gap-2 text-center sm:text-left">
+              <div className="flex flex-col gap-2 text-center sm:text-left flex-1">
                 <p className="font-body text-[#F2EDC2] text-[1rem] sm:text-[1.15rem] lg:text-[1.25rem] italic leading-relaxed">
                   "{r.text}"
                 </p>
-                <p className="font-heading font-semibold text-[#F2EDC2]/80 text-[0.75rem] sm:text-[0.8rem] tracking-widest self-center sm:self-end">
-                  - {r.name}
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-2">
+                  {/* Star rating indicator */}
+                  <div className="flex text-yellow-300 text-sm gap-0.5 justify-center sm:justify-start">
+                    {Array.from({ length: r.rating || 5 }).map((_, i) => (
+                      <span key={i}>★</span>
+                    ))}
+                  </div>
+                  <p className="font-heading font-semibold text-[#F2EDC2]/80 text-[0.75rem] sm:text-[0.8rem] tracking-widest">
+                    - {r.name}
+                  </p>
+                </div>
               </div>
             </div>
           ))}
