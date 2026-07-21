@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import bush from '../../assets/decorative/bush.png'
+import { BACKEND_URL } from '../../constants/api'
 
 const STATS = [
   { label: 'Users',   value: '274' },
@@ -28,7 +29,7 @@ export default function Ending() {
 
   useEffect(() => {
     // Fetch stats
-    fetch("http://127.0.0.1:5000/api/stats/")
+    fetch(`${BACKEND_URL}/stats/`)
       .then(res => res.json())
       .then(data => {
         setStats({
@@ -40,7 +41,7 @@ export default function Ending() {
       .catch(err => console.error("Error fetching stats:", err));
 
     // Fetch reviews
-    fetch("http://127.0.0.1:5000/api/reviews/")
+    fetch(`${BACKEND_URL}/reviews/`)
       .then(res => res.json())
       .then(data => {
         setReviews(data);

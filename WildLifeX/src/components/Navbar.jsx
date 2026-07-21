@@ -3,7 +3,9 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import Button from './Button'
 import logo from '../assets/icons/WildLifeX.ico'
 
-const API_URL = 'http://127.0.0.1:5000/api/auth'
+import { BACKEND_URL } from '../constants/api'
+
+const API_URL = `${BACKEND_URL}/auth`
 
 const NAV_LINKS = [
   { label: 'Home',      to: '/' },

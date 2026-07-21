@@ -4,7 +4,7 @@ import { Simulation, AnimalAgent, ACTIVITY_LABELS } from "../components/simulati
 import SimulationCanvas from "../components/simulation/SimulationCanvas";
 import SimulationDashboard from "../components/simulation/SimulationDashboard";
 
-const BACKEND_URL = "http://127.0.0.1:5000/api";
+import { BACKEND_URL } from "../constants/api";
 
 const ANIMAL_EMOJIS = {
   "snow-leopard": "🐆", "african-elephant": "🐘", "amur-leopard": "🐆",

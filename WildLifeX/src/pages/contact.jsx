@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { BACKEND_URL } from "../constants/api";
 import bushImg       from "../assets/decorative/bush.png";
 import treeBranchImg from "../assets/decorative/treebranch.png";
 import bamboBushImg  from "../assets/decorative/bambobush.png";
@@ -129,7 +130,7 @@ export default function Contact() {
     }
     setSending(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/contact/", {
+      const res = await fetch(`${BACKEND_URL}/contact/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
@@ -156,7 +157,7 @@ export default function Contact() {
     }
     setReviewSending(true);
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/reviews/", {
+      const res = await fetch(`${BACKEND_URL}/reviews/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reviewForm)

@@ -3,7 +3,9 @@ import AnimalCard  from '../components/animals/AnimalCard'
 import AnimalModal from '../components/animals/AnimalModal'
 import FilterBar   from '../components/animals/FilterBar'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:5000'
+import { BASE_URL } from '../constants/api'
+
+const API_BASE = BASE_URL
 
 export const FILTERS = ['All', 'Mammals', 'Birds', 'Reptiles', 'Fish', 'Amphibians']
 

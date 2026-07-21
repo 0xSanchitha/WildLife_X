@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { BACKEND_URL } from "../constants/api";
 import bushImg      from "../assets/decorative/bush.png";
 import tentaclesImg from "../assets/decorative/tenticles.png";
 import whaleImg     from "../assets/decorative/whale.png";
@@ -71,7 +72,7 @@ export default function About() {
   const [stats, setStats] = useState({ users: 274, animals: 120, ecosystems: 45, reviews: 102 });
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/api/stats/")
+    fetch(`${BACKEND_URL}/stats/`)
       .then(res => res.json())
       .then(data => {
         setStats({

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 
-const API_URL = 'http://127.0.0.1:5000/api/auth'
+import { BACKEND_URL } from '../constants/api'
+
+const API_URL = `${BACKEND_URL}/auth`
 
 const UserIcon = ({ className = 'w-5 h-5' }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className}>
