@@ -19,9 +19,13 @@ export default function AnimalListing() {
   useEffect(() => {
     setLoading(true)
     fetch(`${API_BASE}/api/animals/`)
-      .then(r => {
-        if (!r.ok) throw new Error(`Server error ${r.status}`)
-        return r.json()
+      .then(async (r) => {
+        console.log("Status:", r.status)
+
+        const text = await r.text()
+        console.log("Response:", text)
+
+        return JSON.parse(text)
       })
       .then(data => { setAnimals(data); setLoading(false) })
       .catch(err  => { setError(err.message); setLoading(false) })

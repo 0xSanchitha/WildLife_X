@@ -4,7 +4,7 @@ import Navbar      from './components/Navbar'
 import Footer      from './components/footer'
 import Home        from './pages/home'
 import Animal      from './pages/animal'
-import AnimalDetail from './pages/animaldetails'   // ← NEW
+import AnimalDetail from './pages/animaldetails'
 import EcoSystem   from './pages/ecosystem'
 import About       from './pages/about'
 import Contact     from './pages/contact'
