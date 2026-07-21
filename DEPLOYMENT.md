@@ -23,7 +23,7 @@ Make sure your code is pushed to a remote GitHub repository.
    - `SMTP_EMAIL`: `wildlifex74@gmail.com` (Gmail address for notifications)
    - `SMTP_PASSWORD`: Your Gmail App Password (created in Google Account settings -> Security -> App Passwords)
    - `CONTACT_RECIPIENT`: `wildlifex74@gmail.com`
-6. Under **Settings**, find **Networking** and click **Generate Domain**. This will generate a public URL for your backend (e.g., `https://backend-production-xyz.up.railway.app`).
+6. Under **Settings**, find **Networking** and click **Generate Domain** or link custom domain. Since your URL is already generated as `https://wildlifex-production-7a43.up.railway.app`, ensure it matches that.
 7. Save this URL! You will need it for the frontend configuration.
 
 ---
@@ -41,7 +41,7 @@ Vercel is the recommended hosting service for Vite/React applications.
    - **Root Directory**: `WildLifeX` (Select edit, choose the `WildLifeX` folder)
 5. Expand the **Environment Variables** section and add:
    - Key: `VITE_API_URL`
-   - Value: The public Railway URL generated for your backend (e.g., `https://backend-production-xyz.up.railway.app`). Make sure NOT to add a trailing slash.
+   - Value: `https://wildlifex-production-7a43.up.railway.app` (Make sure NOT to add a trailing slash).
 6. Click **Deploy**.
 7. Once deployment is complete, Vercel will provide your live website URL (e.g., `https://wildlifex-website.vercel.app`).
 
