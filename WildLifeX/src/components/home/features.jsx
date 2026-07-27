@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import featureBg from '../../assets/backgrounds/feature.jpg'
 import featureAnimal from '../../assets/articles/feature1.jpg'
 import featureEco from '../../assets/articles/feature2.jpg'
+import useInView from '../../hooks/useInView'
 
 const FEATURES = [
   {
@@ -26,9 +27,10 @@ const FEATURES = [
 
 export default function Features() {
   const navigate = useNavigate()
+  const [sectionRef, inView] = useInView({ threshold: 0.2 })
 
   return (
-    <section id="features" className="relative w-full min-h-screen lg:h-screen overflow-hidden">
+    <section id="features" ref={sectionRef} className="relative w-full min-h-screen lg:h-screen overflow-hidden">
 
       {/* ── BACKGROUND IMAGE ── */}
       <div
@@ -47,21 +49,29 @@ export default function Features() {
                       gap-10 lg:gap-8">
 
         {/* ── SECTION TITLE ── */}
-        <h2 className="font-heading font-extrabold uppercase tracking-[0.25em] text-[#F2EDC2]
+        <h2
+          className={`font-heading font-extrabold uppercase tracking-[0.25em] text-[#F2EDC2]
                        text-[clamp(1.75rem,4vw,3rem)]
-                       text-center leading-none m-0">
+                       text-center leading-none m-0
+                       transition-all duration-700 ease-out motion-reduce:transition-none
+                       ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`}
+        >
           Our Features
         </h2>
 
         {/* ── CARDS GRID ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 w-full max-w-4xl">
-          {FEATURES.map((f) => (
+          {FEATURES.map((f, i) => (
             <div
               key={f.id}
-              className="flex flex-col rounded-[1.25rem] overflow-hidden
+              className={`flex flex-col rounded-[1.25rem] overflow-hidden
                          backdrop-blur-md bg-white/10 border border-white/15
                          shadow-[0_8px_32px_rgba(0,0,0,0.4)]
-                         transition-transform duration-300 hover:-translate-y-2"
+                         transition-all duration-700 ease-out
+                         hover:-translate-y-2 hover:scale-[1.015]
+                         motion-reduce:transition-none
+                         ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`}
+              style={{ transitionDelay: inView ? `${150 + i * 150}ms` : '0ms' }}
             >
               {/* Image */}
               <div className="px-4 pt-4">
@@ -97,7 +107,7 @@ export default function Features() {
                              rounded-full border-2 border-[#F2EDC2] bg-transparent
                              text-[#F2EDC2] font-heading font-semibold text-[0.78rem]
                              cursor-pointer transition-all duration-300
-                             hover:bg-[#F2EDC2]/15">
+                             hover:bg-[#F2EDC2]/15 hover:scale-[1.03] active:scale-[0.98]">
                   Explore
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                     stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

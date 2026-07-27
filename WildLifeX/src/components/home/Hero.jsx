@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import heroBg from '../../assets/backgrounds/Herobg.jpg'
 import article1 from '../../assets/articles/article1.jpg'
 import article2 from '../../assets/articles/article2.jpg'
@@ -33,9 +33,17 @@ const ARTICLES = [
 
 export default function Hero() {
   const [current, setCurrent] = useState(0)
+  const [mounted, setMounted] = useState(false)
+  const [cardKey, setCardKey] = useState(0)
   const article = ARTICLES[current]
-  const prev = () => setCurrent((c) => (c === 0 ? ARTICLES.length - 1 : c - 1))
-  const next = () => setCurrent((c) => (c === ARTICLES.length - 1 ? 0 : c + 1))
+  const prev = () => { setCurrent((c) => (c === 0 ? ARTICLES.length - 1 : c - 1)); setCardKey((k) => k + 1) }
+  const next = () => { setCurrent((c) => (c === ARTICLES.length - 1 ? 0 : c + 1)); setCardKey((k) => k + 1) }
+
+  // ── PAGE-LOAD ENTRANCE ──
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(id)
+  }, [])
 
   // ── SMOOTH SCROLL WITH CUSTOM EASING ──
   const scrollToFeatures = () => {
@@ -82,7 +90,8 @@ export default function Hero() {
 
       {/* ── BACKGROUND IMAGE ── */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[1400ms] ease-out motion-reduce:transition-none
+                    ${mounted ? 'opacity-100' : 'opacity-0'}`}
         style={{ backgroundImage: `url(${heroBg})` }}
       />
 
@@ -95,7 +104,11 @@ export default function Hero() {
         {/* ── LEFT: title + subtitle + button ── */}
         <div className="flex flex-col gap-4 lg:gap-5 items-center lg:items-start text-center lg:text-left">
 
-          <h1 className="leading-none m-0">
+          <h1
+            className={`leading-none m-0 transition-all duration-700 ease-out motion-reduce:transition-none
+                       ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ transitionDelay: '100ms' }}
+          >
             <span className="block font-heading font-extrabold uppercase text-[#F2EDC2] text-[clamp(3.5rem,12vw,8.5rem)]">
               WILD
             </span>
@@ -104,14 +117,22 @@ export default function Hero() {
             </span>
           </h1>
 
-          <p className="font-heading text-[0.85rem] sm:text-[1rem] tracking-[6px] text-[#F7F8F0] opacity-85 leading-loose m-0">
+          <p
+            className={`font-heading text-[0.85rem] sm:text-[1rem] tracking-[6px] text-[#F7F8F0] opacity-85 leading-loose m-0
+                       transition-all duration-700 ease-out motion-reduce:transition-none
+                       ${mounted ? 'opacity-85 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ transitionDelay: '280ms' }}
+          >
             Discover Wildlife<br />Across Ocean and Land
           </p>
 
           {/* ── EXPLORE BUTTON → scrolls to features ── */}
           <button
             onClick={scrollToFeatures}
-            className="inline-flex items-center gap-2 w-fit px-8 sm:px-10 py-[0.7rem] rounded-full border-2 border-[#F2EDC2] bg-transparent text-[#F2EDC2] font-heading font-semibold text-base cursor-pointer transition-all duration-300 hover:bg-[#F2EDC2]/15"
+            className={`inline-flex items-center gap-2 w-fit px-8 sm:px-10 py-[0.7rem] rounded-full border-2 border-[#F2EDC2] bg-transparent text-[#F2EDC2] font-heading font-semibold text-base cursor-pointer transition-all duration-300 hover:bg-[#F2EDC2]/15 hover:scale-[1.03] active:scale-[0.98]
+                       motion-reduce:transition-none
+                       ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+            style={{ transitionDelay: mounted ? '460ms' : '0ms', transitionDuration: mounted ? '700ms' : '300ms' }}
           >
             Explore
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
@@ -123,7 +144,11 @@ export default function Hero() {
         </div>
 
         {/* ── RIGHT: arrows + glass card ── */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div
+          className={`flex items-center gap-2 sm:gap-3 shrink-0 transition-all duration-700 ease-out motion-reduce:transition-none
+                     ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          style={{ transitionDelay: '620ms' }}
+        >
 
           {/* LEFT ARROW */}
           <button
@@ -134,7 +159,10 @@ export default function Hero() {
           </button>
 
           {/* GLASS CARD */}
-          <div className="w-[280px] sm:w-[320px] lg:w-[340px] rounded-[1.25rem] overflow-hidden backdrop-blur-md bg-white/12 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col">
+          <div
+            key={cardKey}
+            className="w-[280px] sm:w-[320px] lg:w-[340px] rounded-[1.25rem] overflow-hidden backdrop-blur-md bg-white/12 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)] flex flex-col animate-[fadeSlide_450ms_ease-out] motion-reduce:animate-none"
+          >
 
             <div className="px-3 pt-3">
               <img
@@ -172,7 +200,7 @@ export default function Hero() {
                 {ARTICLES.map((_, i) => (
                   <button
                     key={i}
-                    onClick={() => setCurrent(i)}
+                    onClick={() => { setCurrent(i); setCardKey((k) => k + 1) }}
                     className="h-2 rounded-full border-none cursor-pointer transition-all duration-300 p-0"
                     style={{
                       width: i === current ? '20px' : '8px',
@@ -196,6 +224,14 @@ export default function Hero() {
         </div>
 
       </div>
+
+      {/* Local keyframes for the article card swap animation */}
+      <style>{`
+        @keyframes fadeSlide {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </section>
   )
 }

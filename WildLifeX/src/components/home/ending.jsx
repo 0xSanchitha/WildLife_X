@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import bush from '../../assets/decorative/bush.png'
 import { BACKEND_URL } from '../../constants/api'
+import useInView from '../../hooks/useInView'
 
 const STATS = [
   { label: 'Users',   value: '274' },
@@ -26,6 +27,7 @@ const REVIEWS = [
 export default function Ending() {
   const [stats, setStats] = useState({ users: 274, animals: 120, reviews: 102 });
   const [reviews, setReviews] = useState([]);
+  const [sectionRef, inView] = useInView({ threshold: 0.15 });
 
   useEffect(() => {
     // Fetch stats
@@ -57,7 +59,7 @@ export default function Ending() {
 
   const activeReviews = reviews.length > 0 ? reviews : REVIEWS;
   return (
-    <section className="relative w-full bg-white overflow-hidden pb-0">
+    <section ref={sectionRef} className="relative w-full bg-white overflow-hidden pb-0">
 
       {/* ── BUSH — bottom-left ── */}
       <img
@@ -90,7 +92,11 @@ export default function Ending() {
       <div className="relative z-10 flex flex-col items-center px-5 sm:px-10 lg:px-16 xl:px-24 pt-14 pb-32 sm:pb-40 lg:pb-48 gap-10 lg:gap-12 max-w-5xl mx-auto">
 
         {/* ── QUOTE ── */}
-        <div className="w-full flex flex-col items-center text-center gap-3 px-2 sm:px-8 lg:px-12">
+        <div
+          className={`w-full flex flex-col items-center text-center gap-3 px-2 sm:px-8 lg:px-12
+                     transition-all duration-700 ease-out motion-reduce:transition-none
+                     ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+        >
           <p className="font-display text-[#1A2E3B] text-[1.3rem] sm:text-[1.6rem] lg:text-[2rem] xl:text-[2.2rem] leading-snug italic">
             "Look deep into nature, and then you will understand everything better."
           </p>
@@ -100,10 +106,19 @@ export default function Ending() {
         </div>
 
         {/* ── DIVIDER ── */}
-        <div className="w-full max-w-3xl h-[2px] rounded-full bg-[#346739]/40" />
+        <div
+          className={`h-[2px] rounded-full bg-[#346739]/40 transition-all duration-700 ease-out motion-reduce:transition-none
+                     ${inView ? 'w-full max-w-3xl opacity-100' : 'w-0 max-w-3xl opacity-0'}`}
+          style={{ transitionDelay: '150ms' }}
+        />
 
         {/* ── STATS CARD ── */}
-        <div className="w-full rounded-[1.25rem] bg-[#346739] px-6 sm:px-10 py-8 sm:py-10 grid grid-cols-3 gap-4 shadow-[0_8px_32px_rgba(52,103,57,0.25)]">
+        <div
+          className={`w-full rounded-[1.25rem] bg-[#346739] px-6 sm:px-10 py-8 sm:py-10 grid grid-cols-3 gap-4 shadow-[0_8px_32px_rgba(52,103,57,0.25)]
+                     transition-all duration-700 ease-out motion-reduce:transition-none
+                     ${inView ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-[0.97]'}`}
+          style={{ transitionDelay: '250ms' }}
+        >
           {displayStats.map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-2 sm:gap-3">
               <p className="font-heading font-bold text-[#79AE6F] text-[0.8rem] sm:text-[1rem] lg:text-[1.1rem] uppercase tracking-widest text-center">
@@ -118,10 +133,13 @@ export default function Ending() {
 
         {/* ── REVIEWS ── */}
         <div className="w-full flex flex-col gap-5">
-          {activeReviews.map((r) => (
+          {activeReviews.map((r, i) => (
             <div
               key={r._id || r.id}
-              className="w-full rounded-[1.25rem] bg-[#79AE6F] px-5 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-[0_4px_20px_rgba(52,103,57,0.2)]"
+              className={`w-full rounded-[1.25rem] bg-[#79AE6F] px-5 sm:px-8 py-6 sm:py-8 flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-[0_4px_20px_rgba(52,103,57,0.2)]
+                         transition-all duration-700 ease-out motion-reduce:transition-none
+                         ${inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+              style={{ transitionDelay: inView ? `${380 + i * 150}ms` : '0ms' }}
             >
               {/* Avatar */}
               <div className="flex-shrink-0 w-[90px] h-[90px] sm:w-[110px] sm:h-[110px] lg:w-[120px] lg:h-[120px] rounded-[0.75rem] bg-[#c8c8c8]/60 overflow-hidden flex items-end justify-center">

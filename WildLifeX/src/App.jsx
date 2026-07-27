@@ -12,7 +12,7 @@ import SignInUp    from './pages/SignInUp'
 import EcosystemBuilder from './pages/EcosystemBuilder'
 import Profile from './pages/Profile'
 
-// ── Scrolls to top on every page change ──────────────────────────────────────
+// ── Scrolls to top on every page change
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
@@ -21,7 +21,7 @@ function ScrollToTop() {
   return null
 }
 
-// ── Wraps pages that need Navbar + Footer ─────────────────────────────────────
+// ── Wraps pages that need Navbar + Footer
 function Layout({ children }) {
   return (
     <>
@@ -32,7 +32,7 @@ function Layout({ children }) {
   )
 }
 
-// ── Router ───────────────────────────────────────────────────────────────────
+// ── Router
 export default function App() {
   return (
     <>
@@ -56,7 +56,7 @@ export default function App() {
         <Route path="/profile"   element={<Layout><Profile />   </Layout>} />
 
         {/*
-          ── Animal Detail page ──────────────────────────────────────────────
+          ── Animal Detail page
           :id  matches whatever comes after /animal/
           e.g. /animal/snow-leopard   → shows Snow Leopard detail
                /animal/manta-ray     → shows Manta Ray detail
