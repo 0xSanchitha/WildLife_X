@@ -1,5 +1,12 @@
 import React, { useRef, useEffect, useState } from "react";
 
+import {
+  FLOWER_VARIANTS, BUSH_VARIANTS, TREES_VARIANTS, ROCK_VARIANTS,
+  CORAL_VARIANTS, REEF_ROCK_VARIANTS,
+  CAVE_IMG, GRASS_IMG, MOUNTAIN_IMG, POND_IMG, KELP_IMG, SEAWEED_IMG,
+  TERRAIN_SIZE
+} from './terrainAssets';
+
 export default function SimulationCanvas({
   sim,
   selectedAnimal,
@@ -79,6 +86,47 @@ export default function SimulationCanvas({
     resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
 
+    const drawAsset = (ctx, imgSrc, x, y, width, height, doFade = false) => {
+      if (!imgSrc) return false;
+      
+      const cacheKey = doFade ? `${imgSrc}_${Math.round(width)}_${Math.round(height)}_faded` : imgSrc;
+      let img = imageCache.current[cacheKey];
+      
+      if (!img) {
+        if (doFade) {
+          const baseImg = imageCache.current[imgSrc] || new Image();
+          if (!baseImg.src) {
+            baseImg.src = imgSrc;
+            imageCache.current[imgSrc] = baseImg;
+          }
+          if (baseImg.complete && baseImg.naturalWidth > 0) {
+            const off = document.createElement("canvas");
+            off.width = width; off.height = height;
+            const octx = off.getContext("2d");
+            octx.drawImage(baseImg, 0, 0, width, height);
+            octx.globalCompositeOperation = "destination-out";
+            const grad = octx.createLinearGradient(0, height * 0.75, 0, height);
+            grad.addColorStop(0, "rgba(0,0,0,0)");
+            grad.addColorStop(1, "rgba(0,0,0,1)");
+            octx.fillStyle = grad;
+            octx.fillRect(0, height * 0.75, width, height);
+            imageCache.current[cacheKey] = off;
+            img = off;
+          }
+        } else {
+          img = new Image();
+          img.src = imgSrc;
+          imageCache.current[imgSrc] = img;
+        }
+      }
+
+      if (img && (img.complete || img instanceof HTMLCanvasElement)) {
+        ctx.drawImage(img, x - width/2, y - height/2, width, height);
+        return true;
+      }
+      return false;
+    };
+
     const render = () => {
       // If tracking, continuously update pan position
       if (trackedAnimal) {
@@ -97,114 +145,39 @@ export default function SimulationCanvas({
 
       // ─── 1. DRAW PROCEDURAL BACKGROUND ───
       if (sim.ecosystemType === "forest") {
-        // Base grass floor
-        ctx.fillStyle = "#6E9146"; // Summer/Spring grass
-        const season = sim.timeSystem.getSeason();
-        if (season === "Autumn") ctx.fillStyle = "#8E8146"; // Brownish
-        else if (season === "Winter") ctx.fillStyle = "#D6E3E6"; // Snowy
-        else if (season === "Spring") ctx.fillStyle = "#79A74E"; // Vibrant
-        
+        ctx.fillStyle = "#6E9146";
         ctx.fillRect(0, 0, sim.width, sim.height);
 
-        // Draw River winding path
-        if (sim.worldMap.riverPoints && sim.worldMap.riverPoints.length > 0) {
-          ctx.beginPath();
-          ctx.strokeStyle = "#4D7CB8";
-          ctx.lineWidth = 45;
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          const pts = sim.worldMap.riverPoints;
-          ctx.moveTo(pts[0].x, pts[0].y);
-          for (let i = 1; i < pts.length; i++) {
-            ctx.lineTo(pts[i].x, pts[i].y);
+        // Draw Soil Patches
+        if (sim.worldMap.soilPatches) {
+          ctx.fillStyle = "#5A4D3B";
+          for (let sp of sim.worldMap.soilPatches) {
+            ctx.save();
+            ctx.globalAlpha = sp.opacity;
+            ctx.beginPath();
+            ctx.ellipse(sp.x, sp.y, sp.w/2, sp.h/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
           }
-          ctx.stroke();
         }
 
         // Draw Ponds
-        ctx.fillStyle = "#5787C4";
         for (let wb of sim.worldMap.waterBodies) {
           if (!wb.isRiver) {
-            ctx.beginPath();
-            ctx.arc(wb.x, wb.y, wb.radius, 0, Math.PI * 2);
-            ctx.fill();
-            // Pond border
-            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-            ctx.lineWidth = 3;
-            ctx.stroke();
+            drawAsset(ctx, POND_IMG, wb.x, wb.y, TERRAIN_SIZE.pond.w, TERRAIN_SIZE.pond.h, true);
           }
         }
-
-        // Draw Obstacles (Rocks/Cliffs)
-        for (let obs of sim.worldMap.obstacles) {
-          // Shadow
-          ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
-          ctx.beginPath();
-          ctx.arc(obs.x + 3, obs.y + 4, obs.radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Rock body
-          ctx.fillStyle = "#7B7D82";
-          ctx.beginPath();
-          ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Cracks/detail
-          ctx.strokeStyle = "#5A5B5E";
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(obs.x - obs.radius * 0.4, obs.y - obs.radius * 0.2);
-          ctx.lineTo(obs.x + obs.radius * 0.2, obs.y + obs.radius * 0.3);
-          ctx.stroke();
-        }
-
-        // Draw Shelters (caves)
-        for (let sh of sim.worldMap.shelters) {
-          ctx.fillStyle = "#2D1D16";
-          ctx.beginPath();
-          ctx.arc(sh.x, sh.y, sh.radius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#4D362B";
-          ctx.lineWidth = 4;
-          ctx.stroke();
-        }
-
       } else { // Ocean
-        // Shallow reef floor vs deep ocean floor
-        ctx.fillStyle = "#22567A"; // deep blue base
-        ctx.fillRect(0, 0, sim.width, sim.height);
-
-        // Shallow zone sand floor
-        const splitX = sim.worldMap.reefSplitX;
+        const splitX = sim.worldMap.reefSplitX || 0;
         const grad = ctx.createLinearGradient(0, 0, splitX + 80, 0);
-        grad.addColorStop(0, "#C7B183"); // Sandy shelf
-        grad.addColorStop(0.7, "#81AB95"); // Reef slope
-        grad.addColorStop(1.0, "#22567A"); // Drop-off to deep blue
+        grad.addColorStop(0, "#C7B183");
+        grad.addColorStop(0.7, "#81AB95");
+        grad.addColorStop(1.0, "#22567A");
         ctx.fillStyle = grad;
         ctx.fillRect(0, 0, splitX + 120, sim.height);
-
-        // Draw Coral Reef structures
-        for (let obs of sim.worldMap.obstacles) {
-          ctx.fillStyle = "rgba(0,0,0,0.15)";
-          ctx.beginPath();
-          ctx.arc(obs.x + 2, obs.y + 3, obs.radius, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = "#C97079"; // Pinkish coral rock
-          if (obs.x % 3 === 0) ctx.fillStyle = "#8BA85C"; // Greenish
-          else if (obs.x % 2 === 0) ctx.fillStyle = "#CFA04C"; // Yellowish
-          
-          ctx.beginPath();
-          ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2);
-          ctx.fill();
-          
-          // Coral details
-          ctx.strokeStyle = "rgba(255,255,255,0.2)";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(obs.x, obs.y, obs.radius * 0.6, 0, Math.PI, true);
-          ctx.stroke();
-        }
+        
+        ctx.fillStyle = "#22567A";
+        ctx.fillRect(splitX + 120, 0, sim.width - (splitX + 120), sim.height);
       }
 
       // Draw Grid overlay
@@ -218,55 +191,124 @@ export default function SimulationCanvas({
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(sim.width, y); ctx.stroke();
       }
 
-      // ─── 2. DRAW PLANTS ───
+      // ─── 2. Z-SORTED RENDERABLES (Plants, Obstacles, Shelters, Mountains) ───
+      const renderables = [];
+
+      if (sim.ecosystemType === "forest") {
+        if (sim.worldMap.mountains) {
+          for (let m of sim.worldMap.mountains) renderables.push({ type: "mountain", item: m });
+        }
+        for (let obs of sim.worldMap.obstacles) renderables.push({ type: "obstacle", item: obs });
+        for (let sh of sim.worldMap.shelters) renderables.push({ type: "shelter", item: sh });
+      } else {
+        for (let obs of sim.worldMap.obstacles) renderables.push({ type: "reefRock", item: obs });
+      }
+
       for (let p of sim.plants) {
-        if (p.isDead) continue;
-        
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        
-        // Determine dynamic max size based on plant type
-        let maxSize = 26;
-        if (sim.ecosystemType === "forest") {
-          if (p.type === "tree") maxSize = 52;
-          else if (p.type === "bush") maxSize = 34;
-          else if (p.type === "flower") maxSize = 24;
-          else if (p.type === "grass") maxSize = 18;
-        } else {
-          if (p.type === "kelp") maxSize = 42;
-          else if (p.type === "seagrass") maxSize = 28;
-          else if (p.type === "coral") maxSize = 36;
+        if (!p.isDead) renderables.push({ type: "plant", item: p });
+      }
+
+      // Sort by Y for correct depth (painters algorithm)
+      renderables.sort((a, b) => a.item.y - b.item.y);
+
+      for (let renderObj of renderables) {
+        const { type, item } = renderObj;
+
+        if (type === "mountain") {
+          const w = TERRAIN_SIZE.mountain.w * (item.sizeVariation || 1);
+          const h = TERRAIN_SIZE.mountain.h * (item.sizeVariation || 1);
+          drawAsset(ctx, MOUNTAIN_IMG, item.x, item.y, w, h, true);
         }
-
-        // Add a slight procedural rotation so plants look organically aligned
-        const rot = ((p.id * 100) % 10) / 10 * 0.4 - 0.2; // -0.2 to +0.2 rads
-        ctx.rotate(rot);
-
-        // Scale with plant growth size
-        const size = p.growth * maxSize;
-        ctx.font = `${size}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        let emoji = "🌱";
-        if (sim.ecosystemType === "forest") {
-          if (p.type === "tree") emoji = "🌳";
-          else if (p.type === "bush") emoji = "🌿";
-          else if (p.type === "flower") emoji = "🌸";
-          else if (p.type === "grass") emoji = "🌱";
-        } else {
-          if (p.type === "kelp") emoji = "🪸";
-          else if (p.type === "coral") emoji = "🪸";
-          else emoji = "🌱";
+        else if (type === "obstacle") {
+          const varIndex = (item.variantIndex || 0) % ROCK_VARIANTS.length;
+          const imgSrc = ROCK_VARIANTS[varIndex];
+          const w = TERRAIN_SIZE.rock.w * (item.sizeVariation || 1);
+          const h = TERRAIN_SIZE.rock.h * (item.sizeVariation || 1);
+          drawAsset(ctx, imgSrc, item.x, item.y, w, h, false);
+        } 
+        else if (type === "shelter") {
+          const w = TERRAIN_SIZE.cave.w * (item.sizeVariation || 1);
+          const h = TERRAIN_SIZE.cave.h * (item.sizeVariation || 1);
+          drawAsset(ctx, CAVE_IMG, item.x, item.y, w, h, true);
         }
+        else if (type === "reefRock") {
+          const varIndex = (item.variantIndex || 0) % REEF_ROCK_VARIANTS.length;
+          const imgSrc = REEF_ROCK_VARIANTS[varIndex];
+          const w = TERRAIN_SIZE.reefRock.w * (item.sizeVariation || 1);
+          const h = TERRAIN_SIZE.reefRock.h * (item.sizeVariation || 1);
+          drawAsset(ctx, imgSrc, item.x, item.y, w, h, true);
+        }
+        else if (type === "plant") {
+          const p = item;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          
+          const rot = ((p.id * 100) % 10) / 10 * 0.4 - 0.2;
+          ctx.rotate(rot);
 
-        // Draw shadow
-        ctx.fillStyle = "rgba(0,0,0,0.15)";
-        ctx.fillText(emoji, 2, 2);
-        
-        // Draw emoji
-        ctx.fillText(emoji, 0, 0);
-        ctx.restore();
+          let imgSrc = null;
+          let baseW = 20, baseH = 20;
+          let doFade = false;
+          
+          if (sim.ecosystemType === "forest") {
+            if (p.type === "trees" || p.type === "tree") {
+              imgSrc = TREES_VARIANTS[(p.variantIndex || 0) % TREES_VARIANTS.length];
+              baseW = TERRAIN_SIZE.trees.w; baseH = TERRAIN_SIZE.trees.h;
+              doFade = true;
+            } else if (p.type === "bush") {
+              imgSrc = BUSH_VARIANTS[(p.variantIndex || 0) % BUSH_VARIANTS.length];
+              baseW = TERRAIN_SIZE.bush.w; baseH = TERRAIN_SIZE.bush.h;
+            } else if (p.type === "flower") {
+              imgSrc = FLOWER_VARIANTS[(p.variantIndex || 0) % FLOWER_VARIANTS.length];
+              baseW = TERRAIN_SIZE.flower.w; baseH = TERRAIN_SIZE.flower.h;
+            } else if (p.type === "grass") {
+              imgSrc = BUSH_VARIANTS[(p.variantIndex || 0) % BUSH_VARIANTS.length];
+              baseW = 20; baseH = 20;
+            }
+          } else {
+            if (p.type === "kelp") {
+              imgSrc = KELP_IMG;
+              baseW = TERRAIN_SIZE.kelp.w; baseH = TERRAIN_SIZE.kelp.h;
+              doFade = true;
+            } else if (p.type === "coral") {
+              imgSrc = CORAL_VARIANTS[(p.variantIndex || 0) % CORAL_VARIANTS.length];
+              baseW = TERRAIN_SIZE.coral.w; baseH = TERRAIN_SIZE.coral.h;
+              doFade = true;
+            } else {
+              imgSrc = SEAWEED_IMG;
+              baseW = TERRAIN_SIZE.seaweed.w; baseH = TERRAIN_SIZE.seaweed.h;
+            }
+          }
+          
+          const sizeMod = (p.sizeVariation || 1) * Math.max(0.2, p.growth);
+          const w = baseW * sizeMod;
+          const h = baseH * sizeMod;
+
+          ctx.shadowColor = "rgba(0,0,0,0.3)";
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetY = 4;
+          
+          const success = drawAsset(ctx, imgSrc, 0, 0, w, h, doFade);
+          ctx.shadowColor = "transparent";
+
+          if (!success) {
+            let emoji = "🌱";
+            if (sim.ecosystemType === "forest") {
+              if (p.type === "trees" || p.type === "tree") emoji = "🌳";
+              else if (p.type === "bush") emoji = "🌿";
+              else if (p.type === "flower") emoji = "🌸";
+            } else {
+              if (p.type === "kelp" || p.type === "coral") emoji = "🪸";
+            }
+            ctx.fillStyle = "rgba(0,0,0,0.15)";
+            ctx.font = `${w}px sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(emoji, 2, 2);
+            ctx.fillText(emoji, 0, 0);
+          }
+          ctx.restore();
+        }
       }
 
       // ─── 2b. CHASE LINES (predator → prey) ───
@@ -390,124 +432,90 @@ export default function SimulationCanvas({
           }
         }
 
-        // Draw rounded rectangle card background
-        ctx.beginPath();
-        ctx.roundRect(-17, -17, 34, 34, 9);
-        ctx.fillStyle = a.isDead ? "rgba(35, 10, 10, 0.45)" : "rgba(20, 20, 20, 0.65)";
-        ctx.fill();
-
-        // Border color based on diet
-        let borderColor = "rgba(255, 255, 255, 0.12)";
-        if (!a.isDead) {
-          if (a.diet === "carnivore") borderColor = "rgba(230, 80, 80, 0.55)";
-          else if (a.diet === "herbivore") borderColor = "rgba(121, 174, 111, 0.55)";
-          else borderColor = "rgba(122, 170, 206, 0.55)";
+        const speciesDef = sim.animalDefinitions ? sim.animalDefinitions[a.speciesId] : null;
+        let baseRadius = 14;
+        if (speciesDef && speciesDef.ecosystemPoints) {
+            // Scale dynamically from points: e.g. 5 pts -> ~11.6px radius, 50 pts -> 26px radius
+            baseRadius = 10 + (speciesDef.ecosystemPoints / 50) * 16;
         }
+
+        // Border and shadow color based on diet
+        let borderColor = "rgba(255, 255, 255, 0.12)";
+        let shadowColor = "rgba(0, 0, 0, 0.3)";
+        if (!a.isDead) {
+          if (a.diet === "carnivore") { borderColor = "rgba(230, 80, 80, 0.75)"; shadowColor = "rgba(230, 80, 80, 0.35)"; }
+          else if (a.diet === "herbivore") { borderColor = "rgba(121, 174, 111, 0.75)"; shadowColor = "rgba(121, 174, 111, 0.35)"; }
+          else { borderColor = "rgba(122, 170, 206, 0.75)"; shadowColor = "rgba(122, 170, 206, 0.35)"; }
+        }
+
+        // Drop shadow for the ring
+        ctx.shadowColor = shadowColor;
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 4;
+
+        // Draw glowing colored backdrop ring
+        ctx.beginPath();
+        ctx.arc(0, 0, baseRadius + 2, 0, Math.PI * 2);
+        ctx.fillStyle = a.isDead ? "rgba(35, 10, 10, 0.65)" : "rgba(20, 20, 20, 0.85)";
+        ctx.fill();
+        
+        ctx.shadowColor = "transparent"; // reset shadow
+        
         ctx.strokeStyle = borderColor;
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // Render emoji based on species
-        ctx.font = a.isDead ? "16px sans-serif" : "20px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        
-        let emoji = "🐾";
-        if (a.isDead) {
-          emoji = "🍖"; // Carcass
-        } else {
-          // Emoji lookup mapping
-          const EMOJIS = {
-            "snow-leopard": "🐆",
-            "african-elephant": "🐘",
-            "amur-leopard": "🐆",
-            "arctic-fox": "🦊",
-            "giant-panda": "🐼",
-            "bald-eagle": "🦅",
-            "emperor-penguin": "🐧",
-            "barn-owl": "🦉",
-            "scarlet-macaw": "🦜",
-            "komodo-dragon": "🦎",
-            "saltwater-crocodile": "🐊",
-            "green-sea-turtle": "🐢",
-            "king-cobra": "🐍",
-            "galapagos-tortoise": "🐢",
-            "great-white-shark": "🦈",
-            "clownfish": "🐠",
-            "manta-ray": "🐋",
-            "atlantic-bluefin-tuna": "🐟",
-            "poison-dart-frog": "🐸",
-            "axolotl": "🦎",
-            "fire-salamander": "🦎",
-            "american-bullfrog": "🐸",
-            "deer": "🦌",
-            "rabbit": "🐇",
-            "mouse": "🐭",
-            "small-fish": "🐟",
-            "squirrel": "🐿️",
-            "boar": "🐗",
-            "woodpecker": "🪶",
-            "plankton": "🔬",
-            "krill": "🦐",
-            "sea-urchin": "🦔",
-            "squid": "🦑",
-            "seal": "🦭",
-            "arctic-fox": "🦊",
-          };
-          emoji = EMOJIS[a.speciesId] || "🐾";
-        }
-
-        // Direction orientation (flip emoji based on heading direction)
-        const angle = Math.atan2(a.vy, a.vx);
-        const facingLeft = angle > Math.PI / 2 || angle < -Math.PI / 2;
-
-        ctx.save();
-        if (facingLeft && !a.isDead) {
-          ctx.scale(-1, 1);
-        }
-        
         let imgLoaded = false;
-        if (!a.isDead && sim.animalDefinitions) {
-          const speciesDef = sim.animalDefinitions[a.speciesId];
-          if (speciesDef) {
+        if (speciesDef) {
             const imageUrl = speciesDef.image || (speciesDef.images && speciesDef.images[0]);
             if (imageUrl) {
               let cachedImg = imageCache.current[imageUrl];
               if (!cachedImg) {
                 cachedImg = new Image();
                 cachedImg.src = imageUrl;
-                cachedImg.onload = () => {
-                  // Re-renders naturally with loop ticks
-                };
+                cachedImg.onload = () => {};
                 imageCache.current[imageUrl] = cachedImg;
               }
               if (cachedImg.complete && cachedImg.naturalWidth > 0) {
                 imgLoaded = true;
                 
-                // Draw rounded circular mask for image inside the card badge
+                // Direction orientation
+                const angle = Math.atan2(a.vy, a.vx);
+                const facingLeft = angle > Math.PI / 2 || angle < -Math.PI / 2;
+                
                 ctx.save();
+                if (facingLeft && !a.isDead) ctx.scale(-1, 1);
+                
+                // Circular clip for image
                 ctx.beginPath();
-                ctx.arc(0, 0, 12.5, 0, Math.PI * 2);
+                ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
                 ctx.clip();
-                // Draw image centered
-                ctx.drawImage(cachedImg, -13, -13, 26, 26);
+
+                if (a.isDead) ctx.globalAlpha = 0.5; // faint image if dead
+                
+                // Draw image
+                ctx.drawImage(cachedImg, -baseRadius, -baseRadius, baseRadius * 2, baseRadius * 2);
                 ctx.restore();
               }
             }
-          }
         }
 
         if (!imgLoaded) {
-          // Draw emoji fallback
-          ctx.fillText(emoji, 0, 1);
+           // Draw fallback circle with first letter
+           ctx.font = `bold ${Math.max(10, baseRadius * 0.9)}px sans-serif`;
+           ctx.textAlign = "center";
+           ctx.textBaseline = "middle";
+           ctx.fillStyle = "#FFF";
+           const letter = speciesDef && speciesDef.name ? speciesDef.name.charAt(0).toUpperCase() : "?";
+           ctx.fillText(a.isDead ? "☠" : letter, 0, 1);
         }
-        ctx.restore();
 
         // Gender marker indicator (small dot in top right of card)
         if (!a.isDead) {
           ctx.fillStyle = a.gender === "Male" ? "#5EA3E3" : "#E35EB8";
           ctx.beginPath();
-          ctx.arc(12, -12, 3.5, 0, Math.PI * 2);
+          ctx.arc(baseRadius * 0.7, -baseRadius * 0.7, 3.5, 0, Math.PI * 2);
           ctx.fill();
           ctx.strokeStyle = "rgba(20, 20, 20, 0.8)";
           ctx.lineWidth = 1.0;
@@ -518,36 +526,36 @@ export default function SimulationCanvas({
         if (a.activity === "Sleep" && !a.isDead) {
           ctx.fillStyle = "#AEE";
           ctx.font = "8px 'Outfit', sans-serif";
-          ctx.fillText("Zzz", 10, -10);
+          ctx.fillText("Zzz", baseRadius * 0.7, -baseRadius - 2);
         }
 
         // Hunger bar (visible when getting hungry)
         if (!a.isDead && a.hunger < 60) {
           ctx.fillStyle = "rgba(0,0,0,0.55)";
-          ctx.fillRect(-14, -20, 28, 3);
-          const hungerPct = a.hunger / 100;
+          ctx.fillRect(-14, -baseRadius - 8, 28, 3);
+          const hungerPct = Math.max(0, a.hunger / 100);
           ctx.fillStyle = hungerPct > 0.35 ? "#F0A032" : "#E65050";
-          ctx.fillRect(-14, -20, 28 * hungerPct, 3);
+          ctx.fillRect(-14, -baseRadius - 8, 28 * hungerPct, 3);
         }
 
         // Modern health bar at bottom of card
         if (!a.isDead && a.health < 100) {
           ctx.fillStyle = "rgba(0,0,0,0.5)";
-          ctx.fillRect(-14, 11, 28, 3.5);
+          ctx.fillRect(-14, baseRadius + 4, 28, 3.5);
           
-          const healthPct = a.health / 100;
+          const healthPct = Math.max(0, a.health / 100);
           ctx.fillStyle = healthPct > 0.5 ? "#79AE6F" : healthPct > 0.25 ? "#F0A032" : "#E65050";
-          ctx.fillRect(-14, 11, 28 * healthPct, 3.5);
+          ctx.fillRect(-14, baseRadius + 4, 28 * healthPct, 3.5);
         }
 
         // Pregnancy progress bar at top of card
         if (!a.isDead && a.pregnant) {
           ctx.fillStyle = "rgba(0,0,0,0.5)";
-          ctx.fillRect(-14, -15, 28, 3.5);
+          ctx.fillRect(-14, -baseRadius - 12, 28, 3.5);
           
-          const pregPct = a.gestationTimer / a.gestationPeriod;
+          const pregPct = Math.max(0, a.gestationTimer / a.gestationPeriod);
           ctx.fillStyle = "#E35EB8"; // Hot pink
-          ctx.fillRect(-14, -15, 28 * pregPct, 3.5);
+          ctx.fillRect(-14, -baseRadius - 12, 28 * pregPct, 3.5);
         }
 
         ctx.restore();
@@ -687,9 +695,31 @@ export default function SimulationCanvas({
       if (Math.hypot(dx, dy) > 4) {
         hasDraggedRef.current = true;
       }
+      
+      let newX = e.clientX - dragStart.x;
+      let newY = e.clientY - dragStart.y;
+      
+      // Clamp panning bounds so the map doesn't get completely lost
+      const canvas = canvasRef.current;
+      if (canvas && sim) {
+        // Allow panning until 80% of the canvas is empty, but keep 20% of the map visible
+        const maxPanX = canvas.width * 0.8;
+        const minPanX = -sim.width * zoom + canvas.width * 0.2;
+        const maxPanY = canvas.height * 0.8;
+        const minPanY = -sim.height * zoom + canvas.height * 0.2;
+        
+        newX = Math.max(minPanX, Math.min(newX, maxPanX));
+        newY = Math.max(minPanY, Math.min(newY, maxPanY));
+        
+        // Adjust dragStart so it doesn't rubber-band if the user dragged way past the clamp
+        if (newX !== e.clientX - dragStart.x || newY !== e.clientY - dragStart.y) {
+          setDragStart({ x: e.clientX - newX, y: e.clientY - newY });
+        }
+      }
+
       setPan({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
+        x: newX,
+        y: newY,
       });
     }
   };
@@ -699,6 +729,9 @@ export default function SimulationCanvas({
   };
 
   const handleWheel = (e) => {
+    if (!e.ctrlKey && !e.metaKey) {
+      return; // Require Ctrl/Cmd to zoom, allowing normal scrolling to pass through
+    }
     e.preventDefault();
     const zoomFactor = 1.1;
     let newZoom = zoom;
@@ -770,7 +803,79 @@ export default function SimulationCanvas({
   };
 
   return (
-    <div ref={containerRef} className="w-full h-full relative overflow-hidden">
+    <div 
+      ref={containerRef} 
+      className="w-full h-full relative overflow-hidden bg-[#0c0c0c]"
+    >
+      {/* Animated River / Ocean SVG Background */}
+      {sim && (
+        <svg
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            transformOrigin: "0 0"
+          }}
+        >
+          <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
+            {sim.ecosystemType === "forest" && sim.worldMap?.riverPoints && (
+              <>
+                <style>
+                  {`
+                    @keyframes riverFlow {
+                      from { stroke-dashoffset: 60; }
+                      to { stroke-dashoffset: 0; }
+                    }
+                    .river-wave {
+                      animation: riverFlow 2s linear infinite;
+                    }
+                  `}
+                </style>
+                <path
+                  d={`M ${sim.worldMap.riverPoints.map(p => `${p.x} ${p.y}`).join(" L ")}`}
+                  fill="none"
+                  stroke="#4D7CB8"
+                  strokeWidth="45"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d={`M ${sim.worldMap.riverPoints.map(p => `${p.x} ${p.y}`).join(" L ")}`}
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.15)"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="15 45"
+                  className="river-wave"
+                />
+              </>
+            )}
+            {sim.ecosystemType === "ocean" && (
+              <>
+                <style>
+                  {`
+                    @keyframes oceanWave {
+                      0% { transform: translateX(0px) translateY(0px); }
+                      50% { transform: translateX(20px) translateY(10px); }
+                      100% { transform: translateX(0px) translateY(0px); }
+                    }
+                    .ocean-wave {
+                      animation: oceanWave 6s ease-in-out infinite;
+                    }
+                  `}
+                </style>
+                <rect x="0" y="0" width={sim.width} height={sim.height} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" strokeDasharray="50 150" className="ocean-wave" />
+                <rect x="0" y="0" width={sim.width} height={sim.height} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="2" strokeDasharray="30 100" className="ocean-wave" style={{animationDelay: "-3s", animationDuration: "8s"}} />
+              </>
+            )}
+          </g>
+        </svg>
+      )}
+
       <canvas
         ref={canvasRef}
         onMouseDown={handleMouseDown}

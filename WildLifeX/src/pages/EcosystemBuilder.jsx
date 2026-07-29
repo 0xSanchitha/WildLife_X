@@ -24,6 +24,7 @@ export default function EcosystemBuilder() {
   const navigate = useNavigate();
   const loopRef = useRef(null);
   const lastTimeRef = useRef(0);
+  const fullscreenContainerRef = useRef(null);
 
   // UI state
   const [worldSize, setWorldSize] = useState(null); // "small", "medium", "large"
@@ -36,6 +37,9 @@ export default function EcosystemBuilder() {
   const [trackedAnimal, setTrackedAnimal] = useState(null);
   const [activeTab, setActiveTab] = useState("stats");
   const [selectedMode, setSelectedMode] = useState("sandbox");
+  const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
+  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Animal Definitions state
   const [fetchedAnimals, setFetchedAnimals] = useState([]);
@@ -82,6 +86,23 @@ export default function EcosystemBuilder() {
         setLoadingAnimals(false);
       });
   }, [type]);
+
+  // Fullscreen listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      if (fullscreenContainerRef.current) fullscreenContainerRef.current.requestFullscreen();
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
+    }
+  };
 
   // Handle simulation initialization
   const handleCreateWorld = (size) => {
@@ -171,7 +192,7 @@ export default function EcosystemBuilder() {
   const handlePlaceObject = (toolType, wx, wy) => {
     if (!sim) return;
 
-    const forestPlants = ["tree", "bush", "flower", "grass"];
+    const forestPlants = ["tree", "trees", "bush", "flower", "grass"];
     const oceanPlants = ["kelp", "seagrass", "coral"];
 
     if (forestPlants.includes(toolType) || oceanPlants.includes(toolType)) {
@@ -197,15 +218,39 @@ export default function EcosystemBuilder() {
         let spawnY = wy;
         const herdMates = sim.animals.filter((a) => a.speciesId === toolType && !a.isDead);
         if (herdMates.length > 0) {
-          const mate = herdMates[Math.floor(Math.random() * herdMates.length)];
-          spawnX = mate.x + (Math.random() - 0.5) * 70;
-          spawnY = mate.y + (Math.random() - 0.5) * 70;
+          let nearest = herdMates[0];
+          let minDist = Infinity;
+          for (let m of herdMates) {
+            const dist = Math.hypot(m.x - wx, m.y - wy);
+            if (dist < minDist) {
+              minDist = dist;
+              nearest = m;
+            }
+          }
+          
+          spawnX = nearest.x + (Math.random() - 0.5) * 60;
+          spawnY = nearest.y + (Math.random() - 0.5) * 60;
           spawnX = Math.max(30, Math.min(sim.width - 30, spawnX));
           spawnY = Math.max(30, Math.min(sim.height - 30, spawnY));
         }
 
         const animal = new AnimalAgent(Date.now(), speciesDef, spawnX, spawnY);
         animal.hunger = 50 + Math.random() * 20; // start hungry enough to seek food quickly
+        
+        // Habitat Validation
+        const animalHabitat = speciesDef.habitat ? speciesDef.habitat.toLowerCase() : "";
+        const isOceanAnimal = animalHabitat === "ocean" || animalHabitat.includes("marine") || ["clownfish", "manta-ray", "atlantic-bluefin-tuna", "green-sea-turtle", "squid", "plankton", "krill", "sea-urchin"].includes(speciesDef.id);
+        const isOceanSim = type === "ocean";
+        
+        if (isOceanAnimal !== isOceanSim) {
+          animal.incompatibleHabitat = true;
+          sim.educationalLogger.logEvent(
+            sim.timeSystem.day, 
+            `⚠️ WARNING: ${speciesDef.name} placed in incompatible habitat! It will lose health rapidly.`, 
+            "disease"
+          );
+        }
+
         sim.addAnimalInstance(animal);
         sim.placedSpecies.add(toolType); // Register that this species was placed
         
@@ -464,6 +509,17 @@ export default function EcosystemBuilder() {
       {/* ───────── TOP STATUS BAR / CLOCK / METRICS ───────── */}
       <header className="flex flex-col md:flex-row md:items-center justify-between px-6 py-3 border-b border-white/5 bg-[#141414]/90 backdrop-blur z-20 shrink-0 gap-3">
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => {
+              if (loopRef.current) cancelAnimationFrame(loopRef.current);
+              setSim(null);
+              navigate(-1);
+            }}
+            className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 text-[#EEEBE4] rounded-full transition cursor-pointer shrink-0"
+            title="Exit Simulation"
+          >
+            ←
+          </button>
           <span className="text-lg">
             {type === "forest" ? "🌲" : "🌊"}
           </span>
@@ -583,18 +639,20 @@ export default function EcosystemBuilder() {
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* ───── LEFT SIDEBAR: TERRAINS AND ANIMAL SPAWNERS ───── */}
-        <aside className="w-56 md:w-64 border-r border-white/5 bg-[#141414] h-full overflow-hidden shrink-0 flex flex-col p-4 gap-6 select-none z-10">
-          
-          {/* TERRAIN BRUSH BRUSHES */}
-          <div>
-            <h3 className="font-heading text-xs font-semibold tracking-wider text-[#EEEBE4]/50 uppercase mb-3">
-              Terrain Brushes
-            </h3>
+        <div className={`relative shrink-0 transition-all duration-300 ${isLeftCollapsed ? 'w-0' : 'w-56 md:w-64'}`}>
+          <aside className={`absolute top-0 left-0 w-56 md:w-64 border-r border-white/5 bg-[#141414] h-full flex flex-col select-none z-20 transition-transform duration-300 ${isLeftCollapsed ? '-translate-x-full' : 'translate-x-0'}`}>
+            
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
+              {/* TERRAIN BRUSH BRUSHES */}
+              <div>
+                <h3 className="font-heading text-xs font-semibold tracking-wider text-[#EEEBE4]/50 uppercase mb-3">
+                  Terrain Brushes
+                </h3>
             <div className="grid grid-cols-2 gap-2">
               {[
                 ...(type === "forest" 
                   ? [
-                      { id: "tree", label: "Tree", emoji: "🌳" },
+                      { id: "trees", label: "Trees", emoji: "🌳" },
                       { id: "bush", label: "Bush", emoji: "🌿" },
                       { id: "flower", label: "Flower", emoji: "🌸" },
                       { id: "grass", label: "Grass", emoji: "🌱" }
@@ -630,7 +688,12 @@ export default function EcosystemBuilder() {
             </h3>
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 min-h-0">
               {fetchedAnimals.map((animal) => {
-                const emoji = ANIMAL_EMOJIS[animal.id] || "🐾";
+                const iconSrc = animal.icon || animal.image || (animal.images && animal.images[0]);
+                
+                let dietColor = "#141414";
+                if (animal.diet?.toLowerCase() === "carnivore") dietColor = "#E65050";
+                else if (animal.diet?.toLowerCase() === "herbivore") dietColor = "#79AE6F";
+                else dietColor = "#7AAACE";
 
                 return (
                   <div
@@ -642,7 +705,27 @@ export default function EcosystemBuilder() {
                         : "bg-[#0c0c0c] border-white/5 hover:border-white/15 text-[#EEEBE4]/85"
                       }`}
                   >
-                    <span className="text-xl shrink-0">{emoji}</span>
+                    {iconSrc ? (
+                      <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 relative flex items-center justify-center bg-black/40 border" style={{ borderColor: dietColor }}>
+                        <img 
+                          src={iconSrc} 
+                          alt={animal.name} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            console.warn(`Missing asset path for ${animal.name} (${iconSrc})`);
+                            e.target.style.display = 'none';
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                        <div className="absolute inset-0 items-center justify-center hidden text-xs font-bold text-white shadow-inner" style={{ backgroundColor: dietColor }}>
+                          {animal.name ? animal.name.charAt(0).toUpperCase() : "?"}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold text-white shadow-inner" style={{ backgroundColor: dietColor }}>
+                        {animal.name ? animal.name.charAt(0).toUpperCase() : "?"}
+                      </div>
+                    )}
                     <div className="overflow-hidden flex-1">
                       <div className="flex items-center gap-1.5 justify-between">
                         <p className="text-[11px] font-heading font-semibold truncate leading-tight">
@@ -664,20 +747,38 @@ export default function EcosystemBuilder() {
             </div>
           </div>
 
-          {/* CLEAR SELECTED TOOL BUTTON */}
-          {selectedTool && (
+              {/* CLEAR SELECTED TOOL BUTTON */}
+              {selectedTool && (
+                <button
+                  onClick={() => setSelectedTool(null)}
+                  className="w-full py-2 bg-red-500/10 border border-red-500/35 hover:bg-red-500 hover:text-black rounded-xl text-[10px] uppercase tracking-wider font-heading font-bold cursor-pointer transition shrink-0"
+                >
+                  Clear Placement Tool
+                </button>
+              )}
+            </div>
+
             <button
-              onClick={() => setSelectedTool(null)}
-              className="w-full py-2 bg-red-500/10 border border-red-500/35 hover:bg-red-500 hover:text-black rounded-xl text-[10px] uppercase tracking-wider font-heading font-bold cursor-pointer transition shrink-0"
+              onClick={() => setIsLeftCollapsed(!isLeftCollapsed)}
+              className="absolute top-1/2 -right-6 w-6 h-16 bg-[#141414] border border-y-white/5 border-r-white/5 border-l-transparent rounded-r-lg flex items-center justify-center z-30 cursor-pointer text-[#EEEBE4]/50 hover:text-white"
+              style={{ transform: "translateY(-50%)" }}
+              title={isLeftCollapsed ? "Expand Tools" : "Collapse Tools"}
             >
-              Clear Placement Tool
+              {isLeftCollapsed ? "▶" : "◀"}
             </button>
-          )}
-        </aside>
+          </aside>
+        </div>
 
         {/* ───── CENTER WORKSPACE: CANVAS MAP ───── */}
         <main className="flex-1 relative overflow-hidden bg-neutral-955 flex flex-col">
-          <div className="flex-1 relative">
+          <div className="flex-1 relative" ref={fullscreenContainerRef}>
+            <button
+              onClick={toggleFullscreen}
+              className="absolute top-4 right-4 bg-black/40 hover:bg-black/60 border border-white/10 text-[#EEEBE4]/80 hover:text-white px-3 py-1.5 rounded-lg z-20 backdrop-blur text-xs font-heading font-semibold transition cursor-pointer flex items-center gap-2 shadow-lg"
+              title="Toggle Fullscreen"
+            >
+              {isFullscreen ? "↙ Exit Fullscreen" : "⛶ Fullscreen"}
+            </button>
             {sim.currentEvent && (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-red-950/80 border border-red-500/35 backdrop-blur-md text-red-400 text-[10px] font-heading font-bold px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 z-10 select-none max-w-sm text-center">
                 <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping shrink-0" />
@@ -729,19 +830,31 @@ export default function EcosystemBuilder() {
         </main>
 
         {/* ───── RIGHT PANEL: DASHBOARD PANELS & SELECTION DETAILS ───── */}
-        <aside className="w-80 md:w-96 border-l border-white/5 bg-[#141414] overflow-y-auto shrink-0 flex flex-col z-10 select-none">
-          
-          {/* Main Dashboard Stats/Charts */}
-          <div className="flex-1 min-h-[300px]">
-            <SimulationDashboard
-              sim={sim}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-            />
-          </div>
+        <div className={`relative shrink-0 transition-all duration-300 ${isRightCollapsed ? 'w-0' : 'w-80 md:w-96'}`}>
+          <aside className={`absolute top-0 right-0 w-80 md:w-96 border-l border-white/5 bg-[#141414] h-full flex flex-col z-20 select-none transition-transform duration-300 ${isRightCollapsed ? 'translate-x-full' : 'translate-x-0'}`}>
+            
+            <button
+              onClick={() => setIsRightCollapsed(!isRightCollapsed)}
+              className="absolute top-1/2 -left-6 w-6 h-16 bg-[#141414] border border-y-white/5 border-l-white/5 border-r-transparent rounded-l-lg flex items-center justify-center z-30 cursor-pointer text-[#EEEBE4]/50 hover:text-white"
+              style={{ transform: "translateY(-50%)" }}
+              title={isRightCollapsed ? "Expand Panel" : "Collapse Panel"}
+            >
+              {isRightCollapsed ? "◀" : "▶"}
+            </button>
 
-          {/* SELECTED ANIMAL DETAILS PANEL */}
-          {selectedAnimal && (
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              
+              {/* Main Dashboard Stats/Charts */}
+              <div className="flex-1 min-h-[300px]">
+                <SimulationDashboard
+                  sim={sim}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                />
+              </div>
+
+              {/* SELECTED ANIMAL DETAILS PANEL */}
+              {selectedAnimal && (
             <div className="border-t border-white/10 bg-black/45 p-4 flex flex-col gap-4 shrink-0">
               <div className="flex items-start justify-between">
                 <div className="flex gap-3">
@@ -868,7 +981,9 @@ export default function EcosystemBuilder() {
               </div>
             </div>
           )}
-        </aside>
+            </div>
+          </aside>
+        </div>
       </div>
 
       {/* ───────── BOTTOM CONTROL PANEL: SAVE, LOAD, RESET ───────── */}

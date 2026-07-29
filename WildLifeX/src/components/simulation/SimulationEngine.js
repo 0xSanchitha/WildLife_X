@@ -258,9 +258,11 @@ export class WorldMap {
     this.width = width;
     this.height = height;
     this.waterBodies = []; // Rivers/ponds [{x, y, radius, isRiver}]
-    this.shelters = [];    // Rock caves/nest spots [{x, y, radius}]
-    this.obstacles = [];   // Impassable rocks/cliffs [{x, y, radius}]
+    this.shelters = [];    // Rock caves/nest spots [{x, y, radius, variantIndex, sizeVariation}]
+    this.obstacles = [];   // Impassable rocks/cliffs [{x, y, radius, variantIndex, sizeVariation}]
     this.zones = [];       // Deep vs shallow water for ocean [{x, y, w, h, depthType}]
+    this.mountains = [];   // Background mountains
+    this.soilPatches = []; // Ground detail [{x, y, w, h, opacity}]
     
     this.generate();
   }
@@ -298,6 +300,28 @@ export class WorldMap {
         this.waterBodies.push({ x: pt.x, y: pt.y, radius: 45, isRiver: true });
       }
 
+      // 1.5 Mountains
+      const mountainCount = 1 + Math.floor(Math.random() * 2);
+      for (let i = 0; i < mountainCount; i++) {
+        this.mountains.push({
+          x: Math.random() * this.width,
+          y: Math.random() * (this.height * 0.4), // mostly top half
+          sizeVariation: 0.85 + Math.random() * 0.3
+        });
+      }
+
+      // 1.6 Soil patches for grass variation
+      const soilCount = 15 + Math.floor(Math.random() * 10);
+      for (let i = 0; i < soilCount; i++) {
+        this.soilPatches.push({
+          x: Math.random() * this.width,
+          y: Math.random() * this.height,
+          w: 100 + Math.random() * 250,
+          h: 80 + Math.random() * 200,
+          opacity: 0.08 + Math.random() * 0.1
+        });
+      }
+
       // Add a couple of ponds
       for (let i = 0; i < 2; i++) {
         this.waterBodies.push({
@@ -314,7 +338,9 @@ export class WorldMap {
         this.obstacles.push({
           x: Math.random() * this.width,
           y: Math.random() * this.height,
-          radius: 10 + Math.random() * 14
+          radius: 10 + Math.random() * 14,
+          variantIndex: Math.floor(Math.random() * 100),
+          sizeVariation: 0.85 + Math.random() * 0.3
         });
       }
 
@@ -324,7 +350,9 @@ export class WorldMap {
         this.shelters.push({
           x: obs.x + (Math.random() - 0.5) * 60,
           y: obs.y + (Math.random() - 0.5) * 60,
-          radius: 30
+          radius: 30,
+          variantIndex: Math.floor(Math.random() * 100),
+          sizeVariation: 0.85 + Math.random() * 0.3
         });
       }
       
@@ -355,7 +383,9 @@ export class WorldMap {
         this.obstacles.push({
           x: Math.random() * splitX * 0.9,
           y: Math.random() * this.height,
-          radius: 12 + Math.random() * 16
+          radius: 12 + Math.random() * 16,
+          variantIndex: Math.floor(Math.random() * 100),
+          sizeVariation: 0.85 + Math.random() * 0.3
         });
       }
 
@@ -364,7 +394,9 @@ export class WorldMap {
         this.shelters.push({
           x: Math.random() * splitX * 0.7 + 50,
           y: Math.random() * this.height * 0.8 + this.height * 0.1,
-          radius: 40
+          radius: 40,
+          variantIndex: Math.floor(Math.random() * 100),
+          sizeVariation: 0.85 + Math.random() * 0.3
         });
       }
     }
@@ -408,7 +440,7 @@ export class WorldMap {
 export class PlantAgent {
   constructor(id, type, x, y) {
     this.id = id;
-    this.type = type; // tree, bush, flower, grass, kelp, seagrass, coral, reef
+    this.type = type; // trees, bush, flower, grass, kelp, seagrass, coral, reef
     this.x = x;
     this.y = y;
     this.growth = 0.2 + Math.random() * 0.3; // Starts young (Seed/Small)
@@ -416,7 +448,8 @@ export class PlantAgent {
     this.isDead = false;
     this.regrowDaysLeft = 0;
     this.colorHue = Math.floor(Math.random() * 40) + 80; // random green tint
-    this.sizeScale = 0.7 + Math.random() * 0.6;
+    this.variantIndex = Math.floor(Math.random() * 100);
+    this.sizeVariation = 0.85 + Math.random() * 0.3;
   }
 
   getGrowthStage() {
@@ -497,6 +530,7 @@ export class AnimalAgent {
     this.water = 80 + Math.random() * 20;  // 0-100
     this.energy = 80 + Math.random() * 20; // 0-100
     this.fear = 0;
+    this.incompatibleHabitat = false;
     
     // AI Sensory Radii
     this.visionRadius = 150;
@@ -559,9 +593,23 @@ export class AnimalAgent {
       return;
     }
 
+    if (this.incompatibleHabitat) {
+      this.health -= 6 * dt; // Rapid continuous health drain
+      if (this.health <= 0 && !this.isDead) {
+        this.die("Incompatible Habitat", simulation);
+        simulation.educationalLogger.logEvent(
+          simulation.timeSystem.day,
+          `💀 ${this.name} died from habitat incompatibility (asphyxiation/temperature shock).`,
+          "disease"
+        );
+        return;
+      }
+    }
+
     this.timeAliveSeconds += dt;
     this.timeSinceLastMeal += dt;
     this.mateCooldownTimer = Math.max(0, this.mateCooldownTimer - dt);
+    if (this.noMateLogCooldown) this.noMateLogCooldown = Math.max(0, this.noMateLogCooldown - dt);
 
     // Showcase eating/drinking — pause AI while visibly feeding
     if (this.eatTimer > 0) {
@@ -985,6 +1033,22 @@ export class AnimalAgent {
           return;
         } else {
           this.targetEntity = null;
+          
+          if (!this.noMateLogCooldown || this.noMateLogCooldown <= 0) {
+            const hasOppositeSex = simulation.animals.some(
+              a => a.speciesId === this.speciesId && a.gender !== this.gender && !a.isDead
+            );
+            if (!hasOppositeSex) {
+              simulation.educationalLogger.logEvent(
+                simulation.timeSystem.day,
+                `⚠️ ${this.name} (${this.gender}) is ready to mate but cannot find a living mate of the opposite sex. Population may collapse!`,
+                "reproduction"
+              );
+              this.noMateLogCooldown = 60; // 60s cooldown for warning
+            } else {
+              this.noMateLogCooldown = 15;
+            }
+          }
         }
       }
     }
@@ -1286,7 +1350,7 @@ export class Simulation {
   initializePlants() {
     const initialCount = this.worldSizeName === "small" ? 40 : this.worldSizeName === "large" ? 120 : 70;
     const types = this.ecosystemType === "forest" 
-      ? ["tree", "bush", "flower", "grass"] 
+      ? ["trees", "bush", "flower", "grass"] 
       : ["kelp", "seagrass", "coral"];
     
     for (let i = 0; i < initialCount; i++) {
