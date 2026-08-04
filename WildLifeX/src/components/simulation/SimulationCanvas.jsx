@@ -6,6 +6,7 @@ import {
   CAVE_IMG, GRASS_IMG, MOUNTAIN_IMG, POND_IMG, KELP_IMG, SEAWEED_IMG,
   TERRAIN_SIZE
 } from './terrainAssets';
+import { SimplexNoise } from './SimulationEngine';
 
 export default function SimulationCanvas({
   sim,
@@ -56,6 +57,131 @@ export default function SimulationCanvas({
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       clearInterval(interval);
     };
+  }, [sim]);
+
+  // Procedural Terrain Generator Cache
+  const bgCanvasRef = useRef(null);
+  
+  useEffect(() => {
+    if (!sim || sim.ecosystemType !== "forest") return;
+    
+    // Generate organic noise map for grass/soil once per simulation instance
+    if (!bgCanvasRef.current || bgCanvasRef.current.width !== sim.width) {
+      const off = document.createElement("canvas");
+      // Use half resolution for generation speed, it's organic so stretching it looks fine
+      const scale = 0.5;
+      off.width = sim.width * scale;
+      off.height = sim.height * scale;
+      const offCtx = off.getContext("2d");
+      
+      const simplex = new SimplexNoise();
+      const imgData = offCtx.createImageData(off.width, off.height);
+      const data = imgData.data;
+
+      // Grass palette: #4F9A3B, #5FAE47, #6CBF4A, #79C95A, #83D16A
+      const grassColors = [
+        [79, 154, 59],
+        [95, 174, 71],
+        [108, 191, 74],
+        [121, 201, 90],
+        [131, 209, 106]
+      ];
+      // Soil palette
+      const soilColors = [
+        [60, 45, 30],  // dark brown
+        [90, 77, 59],  // medium brown
+        [105, 75, 55], // reddish brown
+        [120, 105, 80], // tan
+        [80, 80, 75]   // greyish
+      ];
+
+      // Define river distance function
+      const getDistToRiver = (x, y) => {
+        if (!sim.worldMap.riverPoints) return Infinity;
+        let minDist = Infinity;
+        for (let pt of sim.worldMap.riverPoints) {
+          const d = Math.hypot(pt.x - x, pt.y - y);
+          if (d < minDist) minDist = d;
+        }
+        return minDist;
+      };
+      
+      for (let y = 0; y < off.height; y++) {
+        for (let x = 0; x < off.width; x++) {
+          const wx = x / scale;
+          const wy = y / scale;
+          
+          // Layered grass noise
+          const n1 = simplex.noise2D(wx * 0.003, wy * 0.003) * 0.5 + 0.5;
+          const n2 = simplex.noise2D(wx * 0.015, wy * 0.015) * 0.5 + 0.5;
+          const grassVal = n1 * 0.7 + n2 * 0.3;
+          
+          let colorIdx = Math.floor(grassVal * grassColors.length);
+          if (colorIdx >= grassColors.length) colorIdx = grassColors.length - 1;
+          if (colorIdx < 0) colorIdx = 0;
+          
+          let r = grassColors[colorIdx][0];
+          let g = grassColors[colorIdx][1];
+          let b = grassColors[colorIdx][2];
+
+          // River mud and reeds
+          const distToRiver = getDistToRiver(wx, wy);
+          if (distToRiver < 80) {
+            const mudBlend = Math.max(0, 1 - (distToRiver / 80));
+            // Dark damp mud
+            r = r * (1 - mudBlend) + 60 * mudBlend;
+            g = g * (1 - mudBlend) + 74 * mudBlend;
+            b = b * (1 - mudBlend) + 42 * mudBlend;
+            
+            // Reeds scatter
+            if (distToRiver > 30 && simplex.noise2D(wx * 0.1, wy * 0.1) > 0.8) {
+               r = 100; g = 140; b = 60;
+            }
+          }
+
+          // Layered soil patches noise
+          const s1 = simplex.noise2D(wx * 0.002 + 1000, wy * 0.002 + 1000);
+          if (s1 > 0.35) {
+            const blend = Math.min((s1 - 0.35) * 8, 1.0); // smooth blending
+            
+            // Soil color variation
+            const soilNoise = simplex.noise2D(wx * 0.008 + 500, wy * 0.008 + 500) * 0.5 + 0.5;
+            let sIdx = Math.floor(soilNoise * soilColors.length);
+            if (sIdx >= soilColors.length) sIdx = soilColors.length - 1;
+            let sr = soilColors[sIdx][0];
+            let sg = soilColors[sIdx][1];
+            let sb = soilColors[sIdx][2];
+
+            // Shading
+            const shadeNoise = simplex.noise2D(wx * 0.008 + 501, wy * 0.008 + 501);
+            const shade = 1.0 + shadeNoise * 0.15;
+            sr *= shade; sg *= shade; sb *= shade;
+
+            // Details: pebbles, twigs
+            const detailNoise = simplex.noise2D(wx * 0.1, wy * 0.1);
+            if (detailNoise > 0.85) {
+               sr = 120; sg = 120; sb = 120; // Pebble
+            } else if (detailNoise < -0.85) {
+               sr = 40; sg = 30; sb = 20; // Twig
+            } else if (detailNoise > 0.75 && detailNoise <= 0.85) {
+               sr = 160; sg = 140; sb = 90; // Dry leaf
+            }
+
+            r = r * (1 - blend) + sr * blend;
+            g = g * (1 - blend) + sg * blend;
+            b = b * (1 - blend) + sb * blend;
+          }
+
+          const idx = (y * off.width + x) * 4;
+          data[idx] = r;
+          data[idx+1] = g;
+          data[idx+2] = b;
+          data[idx+3] = 255;
+        }
+      }
+      offCtx.putImageData(imgData, 0, 0);
+      bgCanvasRef.current = off;
+    }
   }, [sim]);
 
   // Handle auto-focus tracking when trackedAnimal changes or moves
@@ -145,26 +271,25 @@ export default function SimulationCanvas({
 
       // ─── 1. DRAW PROCEDURAL BACKGROUND ───
       if (sim.ecosystemType === "forest") {
-        ctx.fillStyle = "#6E9146";
-        ctx.fillRect(0, 0, sim.width, sim.height);
-
-        // Draw Soil Patches
-        if (sim.worldMap.soilPatches) {
-          ctx.fillStyle = "#5A4D3B";
-          for (let sp of sim.worldMap.soilPatches) {
-            ctx.save();
-            ctx.globalAlpha = sp.opacity;
-            ctx.beginPath();
-            ctx.ellipse(sp.x, sp.y, sp.w/2, sp.h/2, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-          }
+        if (bgCanvasRef.current) {
+          ctx.drawImage(bgCanvasRef.current, 0, 0, sim.width, sim.height);
+        } else {
+          ctx.fillStyle = "#6E9146";
+          ctx.fillRect(0, 0, sim.width, sim.height);
         }
 
-        // Draw Ponds
+        // Draw Ponds with rotation
         for (let wb of sim.worldMap.waterBodies) {
           if (!wb.isRiver) {
-            drawAsset(ctx, POND_IMG, wb.x, wb.y, TERRAIN_SIZE.pond.w, TERRAIN_SIZE.pond.h, true);
+            const sizeMult = wb.sizeVariation || 1;
+            const w = TERRAIN_SIZE.pond.w * sizeMult;
+            const h = TERRAIN_SIZE.pond.h * sizeMult;
+            
+            ctx.save();
+            ctx.translate(wb.x, wb.y);
+            ctx.rotate(wb.rotation || 0);
+            drawAsset(ctx, POND_IMG, 0, 0, w, h, true);
+            ctx.restore();
           }
         }
       } else { // Ocean
@@ -224,12 +349,22 @@ export default function SimulationCanvas({
           const imgSrc = ROCK_VARIANTS[varIndex];
           const w = TERRAIN_SIZE.rock.w * (item.sizeVariation || 1);
           const h = TERRAIN_SIZE.rock.h * (item.sizeVariation || 1);
-          drawAsset(ctx, imgSrc, item.x, item.y, w, h, false);
+          
+          ctx.save();
+          ctx.translate(item.x, item.y);
+          ctx.rotate(item.rotation || 0);
+          drawAsset(ctx, imgSrc, 0, 0, w, h, true);
+          ctx.restore();
         } 
         else if (type === "shelter") {
           const w = TERRAIN_SIZE.cave.w * (item.sizeVariation || 1);
           const h = TERRAIN_SIZE.cave.h * (item.sizeVariation || 1);
-          drawAsset(ctx, CAVE_IMG, item.x, item.y, w, h, true);
+          
+          ctx.save();
+          ctx.translate(item.x, item.y);
+          ctx.rotate(item.rotation || 0);
+          drawAsset(ctx, CAVE_IMG, 0, 0, w, h, true);
+          ctx.restore();
         }
         else if (type === "reefRock") {
           const varIndex = (item.variantIndex || 0) % REEF_ROCK_VARIANTS.length;
@@ -802,6 +937,23 @@ export default function SimulationCanvas({
     }
   };
 
+  const generateSmoothPath = (points) => {
+    if (!points || points.length === 0) return "";
+    let path = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = i > 0 ? points[i - 1] : points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = i !== points.length - 2 ? points[i + 2] : p2;
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+    return path;
+  };
+
   return (
     <div 
       ref={containerRef} 
@@ -832,26 +984,94 @@ export default function SimulationCanvas({
                     .river-wave {
                       animation: riverFlow 2s linear infinite;
                     }
+                    @keyframes rippleAnim {
+                      0% { r: 6px; opacity: 1; stroke-width: 2px; }
+                      100% { r: 24px; opacity: 0; stroke-width: 1px; }
+                    }
+                    .ripple-anim {
+                      animation: rippleAnim 2.5s ease-out infinite;
+                    }
                   `}
                 </style>
-                <path
-                  d={`M ${sim.worldMap.riverPoints.map(p => `${p.x} ${p.y}`).join(" L ")}`}
-                  fill="none"
-                  stroke="#4D7CB8"
-                  strokeWidth="45"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d={`M ${sim.worldMap.riverPoints.map(p => `${p.x} ${p.y}`).join(" L ")}`}
-                  fill="none"
-                  stroke="rgba(255, 255, 255, 0.15)"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="15 45"
-                  className="river-wave"
-                />
+                <defs>
+                  <filter id="riverTurbulence" x="-20%" y="-20%" width="140%" height="140%">
+                    <feTurbulence type="fractalNoise" baseFrequency="0.015" numOctaves="3" result="noise" />
+                    <feDisplacementMap in="SourceGraphic" in2="noise" scale="20" xChannelSelector="R" yChannelSelector="G" />
+                  </filter>
+                  <filter id="shorelineBlur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="6" result="blur" />
+                    <feComponentTransfer>
+                      <feFuncA type="linear" slope="0.7" />
+                    </feComponentTransfer>
+                  </filter>
+                  <linearGradient id="riverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#2D6392" />
+                    <stop offset="100%" stopColor="#4BB6D1" />
+                  </linearGradient>
+                  <linearGradient id="riverDeep" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#1B466B" />
+                    <stop offset="100%" stopColor="#267891" />
+                  </linearGradient>
+                </defs>
+                <g filter="url(#riverTurbulence)">
+                  {/* Shoreline blend */}
+                  <path
+                    d={generateSmoothPath(sim.worldMap.riverPoints)}
+                    fill="none"
+                    stroke="#163852"
+                    strokeWidth="60"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#shorelineBlur)"
+                  />
+                  {/* Base shallow river */}
+                  <path
+                    d={generateSmoothPath(sim.worldMap.riverPoints)}
+                    fill="none"
+                    stroke="url(#riverGrad)"
+                    strokeWidth="48"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {/* Deep center channel */}
+                  <path
+                    d={generateSmoothPath(sim.worldMap.riverPoints)}
+                    fill="none"
+                    stroke="url(#riverDeep)"
+                    strokeWidth="28"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  {/* River wave animation */}
+                  <path
+                    d={generateSmoothPath(sim.worldMap.riverPoints)}
+                    fill="none"
+                    stroke="rgba(255, 255, 255, 0.3)"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="20 60"
+                    className="river-wave"
+                  />
+                </g>
+                
+                {/* Submerged Rocks and Circular Ripples */}
+                {sim.worldMap.riverPoints.map((p, i) => {
+                  if (i % 5 === 0 && i !== 0 && i !== sim.worldMap.riverPoints.length - 1) {
+                    // pseudo-random deterministic rock placement
+                    const isRock = (Math.sin(p.x * 12.34) * 1000) % 10 > 5;
+                    if (isRock) {
+                      return (
+                        <g key={`rock-${i}`} transform={`translate(${p.x}, ${p.y})`}>
+                          <circle r="7" fill="#3B484D" opacity="0.8" />
+                          <circle r="5" fill="#52636B" opacity="0.9" cx="-1" cy="-1" />
+                          <circle r="6" fill="none" stroke="rgba(255,255,255,0.6)" className="ripple-anim" />
+                        </g>
+                      );
+                    }
+                  }
+                  return null;
+                })}
               </>
             )}
             {sim.ecosystemType === "ocean" && (

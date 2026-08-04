@@ -192,16 +192,32 @@ export default function EcosystemBuilder() {
   const handlePlaceObject = (toolType, wx, wy) => {
     if (!sim) return;
 
+    // Basic overlap check
+    const isOverlapping = (x, y) => {
+      if (sim.worldMap.isColliding(x, y, 15).colliding) return true;
+      for (let p of sim.plants) {
+        if (!p.isDead && Math.hypot(p.x - x, p.y - y) < 25) return true;
+      }
+      for (let a of sim.animals) {
+        if (!a.isDead && Math.hypot(a.x - x, a.y - y) < 30) return true;
+      }
+      return false;
+    };
+
     const forestPlants = ["tree", "trees", "bush", "flower", "grass"];
     const oceanPlants = ["kelp", "seagrass", "coral"];
 
     if (forestPlants.includes(toolType) || oceanPlants.includes(toolType)) {
+      if (isOverlapping(wx, wy)) return;
       sim.spawnPlant(toolType, wx, wy);
     } else if (toolType === "rock") {
+      if (isOverlapping(wx, wy)) return;
       sim.worldMap.obstacles.push({
         x: wx,
         y: wy,
-        radius: 10 + Math.random() * 8
+        radius: 10 + Math.random() * 8,
+        variantIndex: Math.floor(Math.random() * 100),
+        sizeVariation: 0.5 + Math.random() * 0.4
       });
     } else {
       // It is an animal species ID
@@ -228,11 +244,25 @@ export default function EcosystemBuilder() {
             }
           }
           
-          spawnX = nearest.x + (Math.random() - 0.5) * 60;
-          spawnY = nearest.y + (Math.random() - 0.5) * 60;
-          spawnX = Math.max(30, Math.min(sim.width - 30, spawnX));
-          spawnY = Math.max(30, Math.min(sim.height - 30, spawnY));
+          let tries = 0;
+          let validSpawn = false;
+          while (tries < 10) {
+            spawnX = nearest.x + (Math.random() - 0.5) * 80;
+            spawnY = nearest.y + (Math.random() - 0.5) * 80;
+            spawnX = Math.max(30, Math.min(sim.width - 30, spawnX));
+            spawnY = Math.max(30, Math.min(sim.height - 30, spawnY));
+            if (!isOverlapping(spawnX, spawnY)) {
+              validSpawn = true;
+              break;
+            }
+            tries++;
+          }
+          if (!validSpawn) {
+            spawnX = wx; spawnY = wy;
+          }
         }
+        
+        if (isOverlapping(spawnX, spawnY)) return; // Final fallback prevent overlap
 
         const animal = new AnimalAgent(Date.now(), speciesDef, spawnX, spawnY);
         animal.hunger = 50 + Math.random() * 20; // start hungry enough to seek food quickly

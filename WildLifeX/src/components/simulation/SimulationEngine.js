@@ -1,6 +1,107 @@
 // SimulationEngine.js
 // Decoupled core simulation logic for the HNDIT Educational Ecosystem Simulator.
 
+export function cyrb128(str) {
+  let h1 = 1779033703, h2 = 3144134277, h3 = 1013904242, h4 = 2773480762;
+  for (let i = 0, k; i < str.length; i++) {
+    k = str.charCodeAt(i);
+    h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+    h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+    h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+    h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+  }
+  h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+  h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+  h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+  h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+  return [(h1^h2^h3^h4)>>>0, (h2^h1)>>>0, (h3^h1)>>>0, (h4^h1)>>>0];
+}
+
+export function sfc32(a, b, c, d) {
+  return function() {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0; 
+    var t = (a + b) | 0;
+    a = b ^ b >>> 9;
+    b = c + (c << 3) | 0;
+    c = (c << 21 | c >>> 11);
+    d = d + 1 | 0;
+    t = t + d | 0;
+    c = c + t | 0;
+    return (t >>> 0) / 4294967296;
+  }
+}
+
+let seedStr = "wildlifex-seed-" + Date.now();
+let seedState = cyrb128(seedStr);
+export let engineRandom = sfc32(seedState[0], seedState[1], seedState[2], seedState[3]);
+
+export function setEngineSeed(str) {
+  seedStr = str;
+  seedState = cyrb128(str);
+  engineRandom = sfc32(seedState[0], seedState[1], seedState[2], seedState[3]);
+}
+
+export class SimplexNoise {
+  constructor(randomFunc = engineRandom) {
+    this.grad3 = [
+      [1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],
+      [1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],
+      [0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]
+    ];
+    this.p = new Uint8Array(256);
+    for (let i=0; i<256; i++) this.p[i] = i;
+    for (let i=255; i>0; i--) {
+      const r = Math.floor(randomFunc() * (i+1));
+      const temp = this.p[i];
+      this.p[i] = this.p[r];
+      this.p[r] = temp;
+    }
+    this.perm = new Uint8Array(512);
+    this.permMod12 = new Uint8Array(512);
+    for (let i=0; i<512; i++) {
+      this.perm[i] = this.p[i & 255];
+      this.permMod12[i] = this.perm[i] % 12;
+    }
+  }
+  
+  dot(g, x, y) { return g[0]*x + g[1]*y; }
+  
+  noise2D(xin, yin) {
+    const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+    const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+    let n0, n1, n2;
+    const s = (xin + yin) * F2;
+    const i = Math.floor(xin + s);
+    const j = Math.floor(yin + s);
+    const t = (i + j) * G2;
+    const X0 = i - t;
+    const Y0 = j - t;
+    const x0 = xin - X0;
+    const y0 = yin - Y0;
+    let i1, j1;
+    if (x0 > y0) { i1=1; j1=0; } else { i1=0; j1=1; }
+    const x1 = x0 - i1 + G2;
+    const y1 = y0 - j1 + G2;
+    const x2 = x0 - 1.0 + 2.0 * G2;
+    const y2 = y0 - 1.0 + 2.0 * G2;
+    const ii = i & 255;
+    const jj = j & 255;
+    const gi0 = this.permMod12[ii + this.perm[jj]];
+    const gi1 = this.permMod12[ii + i1 + this.perm[jj + j1]];
+    const gi2 = this.permMod12[ii + 1 + this.perm[jj + 1]];
+    let t0 = 0.5 - x0*x0 - y0*y0;
+    if (t0 < 0) n0 = 0.0;
+    else { t0 *= t0; n0 = t0 * t0 * this.dot(this.grad3[gi0], x0, y0); }
+    let t1 = 0.5 - x1*x1 - y1*y1;
+    if (t1 < 0) n1 = 0.0;
+    else { t1 *= t1; n1 = t1 * t1 * this.dot(this.grad3[gi1], x1, y1); }
+    let t2 = 0.5 - x2*x2 - y2*y2;
+    if (t2 < 0) n2 = 0.0;
+    else { t2 *= t2; n2 = t2 * t2 * this.dot(this.grad3[gi2], x2, y2); }
+    return 70.0 * (n0 + n1 + n2);
+  }
+}
+
 export function normalizeSpeciesKey(key) {
   return (key || "").toLowerCase().replace(/\s+/g, "-").replace(/_/g, "-");
 }
@@ -324,36 +425,54 @@ export class WorldMap {
 
       // Add a couple of ponds
       for (let i = 0; i < 2; i++) {
-        this.waterBodies.push({
-          x: Math.random() * this.width * 0.8 + this.width * 0.1,
-          y: Math.random() * this.height * 0.8 + this.height * 0.1,
-          radius: 35 + Math.random() * 20,
-          isRiver: false
-        });
+        let spawned = false;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const px = engineRandom() * this.width * 0.8 + this.width * 0.1;
+          const py = engineRandom() * this.height * 0.8 + this.height * 0.1;
+          const r = 35 + engineRandom() * 20;
+          if (!this._isOverlappingAny(px, py, r * 1.5)) {
+            this.waterBodies.push({
+              x: px, y: py, radius: r, sizeVariation: 0.8 + engineRandom() * 0.5, isRiver: false
+            });
+            spawned = true;
+            break;
+          }
+        }
       }
 
       // 2. Obstacles (rocks/cliffs)
-      const obstacleCount = 6 + Math.floor(Math.random() * 6);
+      const obstacleCount = 6 + Math.floor(engineRandom() * 6);
       for (let i = 0; i < obstacleCount; i++) {
-        this.obstacles.push({
-          x: Math.random() * this.width,
-          y: Math.random() * this.height,
-          radius: 10 + Math.random() * 14,
-          variantIndex: Math.floor(Math.random() * 100),
-          sizeVariation: 0.85 + Math.random() * 0.3
-        });
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const px = engineRandom() * this.width;
+          const py = engineRandom() * this.height;
+          const r = 8 + engineRandom() * 8; // made rocks much smaller
+          if (!this._isOverlappingAny(px, py, r * 2.0)) {
+            this.obstacles.push({
+              x: px, y: py, radius: r, variantIndex: Math.floor(engineRandom() * 100),
+              sizeVariation: 0.5 + engineRandom() * 0.4, // smaller sizing
+              rotation: engineRandom() * Math.PI * 2
+            });
+            break;
+          }
+        }
       }
 
-      // 3. Shelters (caves/hollow logs) near rocks
-      for (let i = 0; i < 3; i++) {
-        const obs = this.obstacles[i % this.obstacles.length];
-        this.shelters.push({
-          x: obs.x + (Math.random() - 0.5) * 60,
-          y: obs.y + (Math.random() - 0.5) * 60,
-          radius: 30,
-          variantIndex: Math.floor(Math.random() * 100),
-          sizeVariation: 0.85 + Math.random() * 0.3
-        });
+      // 3. Shelters (caves/nests)
+      const shelterCount = 3 + Math.floor(engineRandom() * 3);
+      for (let i = 0; i < shelterCount; i++) {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const px = engineRandom() * this.width;
+          const py = engineRandom() * this.height;
+          const r = 25;
+          if (!this._isOverlappingAny(px, py, r * 1.5)) {
+            this.shelters.push({
+              x: px, y: py, radius: r, variantIndex: Math.floor(engineRandom() * 100),
+              sizeVariation: 0.8 + engineRandom() * 0.4
+            });
+            break;
+          }
+        }
       }
       
     } else { // Ocean
@@ -385,7 +504,8 @@ export class WorldMap {
           y: Math.random() * this.height,
           radius: 12 + Math.random() * 16,
           variantIndex: Math.floor(Math.random() * 100),
-          sizeVariation: 0.85 + Math.random() * 0.3
+          sizeVariation: 0.85 + Math.random() * 0.3,
+          rotation: Math.random() * Math.PI * 2
         });
       }
 
@@ -396,22 +516,52 @@ export class WorldMap {
           y: Math.random() * this.height * 0.8 + this.height * 0.1,
           radius: 40,
           variantIndex: Math.floor(Math.random() * 100),
-          sizeVariation: 0.85 + Math.random() * 0.3
+          sizeVariation: 0.85 + Math.random() * 0.3,
+          rotation: Math.random() * Math.PI * 2
         });
       }
     }
   }
 
+  _isOverlappingAny(x, y, radius) {
+    for (let obs of this.obstacles) {
+      if (Math.hypot(obs.x - x, obs.y - y) < obs.radius + radius) return true;
+    }
+    for (let sh of this.shelters) {
+      if (Math.hypot(sh.x - x, sh.y - y) < sh.radius + radius) return true;
+    }
+    for (let wb of this.waterBodies) {
+      if (Math.hypot(wb.x - x, wb.y - y) < wb.radius + radius) return true;
+    }
+    return false;
+  }
+
   isColliding(x, y, radius = 5) {
     // Avoid running into hard obstacles
     for (let obs of this.obstacles) {
-      const dx = obs.x - x;
-      const dy = obs.y - y;
+      const dx = x - obs.x; // Vector from obstacle to animal
+      const dy = y - obs.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < obs.radius + radius) {
-        return { colliding: true, pushX: dx / dist, pushY: dy / dist };
+        const pushForce = Math.max(0.1, 1 - (dist / (obs.radius + radius)));
+        return { colliding: true, pushX: (dx / dist) * pushForce, pushY: (dy / dist) * pushForce };
       }
     }
+    
+    // Avoid walking into water bodies if terrestrial
+    if (this.ecosystemType === "forest") {
+      for (let wb of this.waterBodies) {
+        const dx = x - wb.x;
+        const dy = y - wb.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        // Rivers are lines of points, Ponds are large circles.
+        if (dist < wb.radius + radius - 5) {
+          const pushForce = Math.max(0.1, 1 - (dist / (wb.radius + radius)));
+          return { colliding: true, pushX: (dx / dist) * pushForce, pushY: (dy / dist) * pushForce };
+        }
+      }
+    }
+    
     return { colliding: false };
   }
 

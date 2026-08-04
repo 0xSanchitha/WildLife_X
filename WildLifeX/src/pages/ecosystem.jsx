@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 // import oceanImg  from "../assets/ecosystems/ocean.jpg";
 // Using Unsplash placeholders until you wire up real assets:
 const FOREST_IMG = "https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200&q=85";
-const OCEAN_IMG  = "https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=1200&q=85";
+const OCEAN_IMG  = "https://images.unsplash.com/photo-1514907283155-ea5f4094c70c?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
 // ─── STYLES ──────────────────────────────────────────────────────────────────
 const STYLES = `
