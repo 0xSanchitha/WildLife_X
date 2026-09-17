@@ -566,7 +566,7 @@ Tracked metrics include:
 
 # Technical Architecture
 
-![WildLifeX Technical Architecture](screenshots/technical-architecture.jpeg)
+![WildLifeX Technical Architecture](screenshots/technical-architecture.png)
 
 The simulation engine operates independently from React's component tree.
 
