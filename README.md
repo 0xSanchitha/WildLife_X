@@ -564,63 +564,9 @@ Tracked metrics include:
 
 # Technical Architecture
 
-```text
-                         User
-                           |
-                           v
-              +------------------------+
-              |      React Frontend    |
-              |                        |
-              | UI / Pages / Controls  |
-              | Authentication         |
-              | Analytics              |
-              +-----------+------------+
-                          |
-                          | REST API
-                          v
-              +------------------------+
-              |       Flask API        |
-              |                        |
-              | Authentication         |
-              | Animal Catalogue       |
-              | Simulations             |
-              | Statistics              |
-              | Reviews                 |
-              | Contact                 |
-              +-----------+------------+
-                          |
-                          v
-              +------------------------+
-              |      MongoDB Atlas     |
-              |                        |
-              | Users                   |
-              | Animals                 |
-              | Simulations             |
-              | Reviews                 |
-              | Contact Messages        |
-              +------------------------+
+# Technical Architecture
 
-
-        Browser-Side Simulation Engine
-
-              +------------------------+
-              |  SimulationEngine.js   |
-              |                        |
-              | Animal Agents           |
-              | State Machine AI        |
-              | Predator / Prey         |
-              | Reproduction            |
-              | Ecology Systems         |
-              | Weather / Time          |
-              | Spatial Hash Grid       |
-              +-----------+------------+
-                          |
-                          v
-              +------------------------+
-              |     HTML5 Canvas       |
-              |       2D Renderer       |
-              +------------------------+
-```
+![WildLifeX Technical Architecture](screenshots/technical-architecture.jpeg)
 
 The simulation engine operates independently from React's component tree.
 
