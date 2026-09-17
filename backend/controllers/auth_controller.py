@@ -9,7 +9,7 @@ SECRET_KEY = "wildlifex_secret"
 
 
 def register():
-    data = request.json
+    data = request.get_json(silent=True) or {}
 
     username = data.get("username")
     email    = data.get("email")
@@ -32,7 +32,7 @@ def register():
 
 
 def login():
-    data = request.json
+    data = request.get_json(silent=True) or {}
 
     email    = data.get("email")
     password = data.get("password")

@@ -176,12 +176,20 @@ export default function SignInUp({ initialMode = 'register' }) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ username, email, password }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.message); return }
+      let data = null
+      try {
+        data = await res.json()
+      } catch {
+        // Response was not JSON
+      }
+      if (!res.ok) {
+        setError(data?.message || `Registration failed (Status ${res.status}).`)
+        return
+      }
       // Auto-redirect to sign in after successful registration
       switchToLogin()
-    } catch {
-      setError('Could not reach the server. Is Flask running?')
+    } catch (err) {
+      setError(err?.message === 'Failed to fetch' ? 'Could not reach the server. Is Flask running?' : (err?.message || 'Network error'))
     } finally {
       setLoading(false)
     }
@@ -200,15 +208,23 @@ export default function SignInUp({ initialMode = 'register' }) {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email, password }),
       })
-      const data = await res.json()
-      if (!res.ok) { setError(data.message); return }
+      let data = null
+      try {
+        data = await res.json()
+      } catch {
+        // Response was not JSON
+      }
+      if (!res.ok) {
+        setError(data?.message || `Login failed (Status ${res.status}).`)
+        return
+      }
       localStorage.setItem('token', data.token)
       // Dispatch 'auth-user' with the username from the login response.
       // The Navbar reads it directly — no extra /me fetch, no race condition.
       window.dispatchEvent(new CustomEvent('auth-user', { detail: { username: data.username } }))
       navigate('/')
-    } catch {
-      setError('Could not reach the server. Is Flask running?')
+    } catch (err) {
+      setError(err?.message === 'Failed to fetch' ? 'Could not reach the server. Is Flask running?' : (err?.message || 'Network error'))
     } finally {
       setLoading(false)
     }
